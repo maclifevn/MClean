@@ -367,9 +367,12 @@
 "Show system monitor in menu bar" = "Show system monitor in menu bar";
 "Live CPU, memory, and disk meters in the menu bar. MClean keeps running in the background while this is on." = "Live CPU, memory, and disk meters in the menu bar. MClean keeps running in the background while this is on.";
 "CPU" = "CPU";
+"CPU %lld%%" = "CPU %lld%%";
 "Memory" = "Memory";
 "Disk" = "Disk";
+"Live" = "Live";
 "Open MClean" = "Open MClean";
+"Settings…" = "Settings…";
 "Quit MClean" = "Quit MClean";
 
 /* Space Lens */
