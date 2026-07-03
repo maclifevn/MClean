@@ -40,6 +40,18 @@ final class ScanProgressTicker: ObservableObject {
     @Published var path: String = ""
 }
 
+/// Medium-frequency scan/clean progress, isolated from AppState for the same
+/// reason as ScanProgressTicker: these values update on every category
+/// completion and every clean-progress callback. Publishing them from
+/// AppState invalidated every AppState-observing view (sidebar, app list,
+/// rows) per tick; only the dashboard's hero gauges actually display them.
+@MainActor
+final class ScanActivity: ObservableObject {
+    @Published var scanProgress: Double = 0
+    @Published var cleanProgress: Double = 0
+    @Published var currentCategory: String = ""
+}
+
 @MainActor
 final class AppState: ObservableObject {
     typealias AppFileScanner = @MainActor (
@@ -56,9 +68,10 @@ final class AppState: ObservableObject {
     @Published var diskInfo = DiskInfo()
     @Published var totalJunkSize: Int64 = 0
     @Published var totalFreedSpace: Int64 = 0
-    @Published var scanProgress: Double = 0
-    @Published var cleanProgress: Double = 0
-    @Published var currentScanCategory: String = ""
+    /// Scan/clean progress values. Deliberately NOT `@Published` fields on
+    /// AppState — they tick frequently during scans/cleans and only the
+    /// dashboard hero observes them (same isolation pattern as `scanTicker`).
+    let activity = ScanActivity()
     /// Live filesystem path the scan engine is touching, feeding the dashboard's
     /// ticker. Deliberately NOT a `@Published` on AppState — it updates ~10×/sec
     /// and would otherwise invalidate the whole view tree (issues #119, #120).
@@ -743,12 +756,11 @@ final class AppState: ObservableObject {
 
     private func retryCleanItems(_ items: [CleanableItem]) async {
         scanState = .cleaning(progress: 0)
-        cleanProgress = 0
+        activity.cleanProgress = 0
 
         var result = await cleaningEngine.cleanItems(items) { [weak self] progress in
             Task { @MainActor [weak self] in
-                self?.cleanProgress = progress
-                self?.scanState = .cleaning(progress: progress)
+                self?.activity.cleanProgress = progress
             }
         }
         if !result.requiresAdmin.isEmpty {
@@ -808,32 +820,63 @@ final class AppState: ObservableObject {
     func startSmartScan() {
         guard !scanState.isActive else { return }
 
-        scanState = .scanning(progress: 0, currentCategory: "Preparing...")
+        // scanState now changes only on real transitions (idle → scanning →
+        // completed); per-tick progress lives on `activity` so the whole
+        // AppState-observing view tree isn't invalidated on every update.
+        scanState = .scanning(progress: 0, currentCategory: "")
         categoryResults = [:]
         totalJunkSize = 0
-        scanProgress = 0
+        activity.scanProgress = 0
         clearSelectionState()
 
         Task {
             let categories = CleaningCategory.scannable
             let total = categories.count
+            var completed = 0
 
-            for (index, category) in categories.enumerated() {
-                let progress = Double(index) / Double(total)
-                scanProgress = progress
-                currentScanCategory = category.rawValue
-                scanState = .scanning(progress: progress, currentCategory: category.rawValue)
-
-                let result = await scanEngine.scanCategory(category) { [weak self] path in
-                    Task { @MainActor [weak self] in
-                        self?.scanTicker.path = path
-                    }
+            let onPath: @Sendable (String) -> Void = { [weak self] path in
+                Task { @MainActor [weak self] in
+                    self?.scanTicker.path = path
                 }
-                categoryResults[category] = result
-                totalJunkSize += result.totalSize
             }
 
-            scanProgress = 1.0
+            // Categories are independent, so run them concurrently. Each task
+            // gets its OWN ScanEngine instance: the engine is an actor whose
+            // path-reporter state would serialize (and race) concurrent scans
+            // on a shared instance. In-flight is capped so disk-walk
+            // categories don't thrash the drive while Process-spawning ones
+            // (brew/node/docker) wait on their subprocesses.
+            await withTaskGroup(of: (CleaningCategory, CategoryResult).self) { group in
+                var pending = categories.makeIterator()
+                var inFlight = 0
+                let cap = 4
+
+                // Nested funcs don't inherit the surrounding MainActor
+                // isolation, so submitNext touches no UI state — the label
+                // updates happen in the (isolated) while-loop below instead.
+                func submitNext() {
+                    guard let category = pending.next() else { return }
+                    inFlight += 1
+                    group.addTask {
+                        let engine = ScanEngine()
+                        let result = await engine.scanCategory(category, onPath: onPath)
+                        return (category, result)
+                    }
+                }
+                for _ in 0..<cap { submitNext() }
+                while inFlight > 0 {
+                    guard let (category, result) = await group.next() else { break }
+                    inFlight -= 1
+                    completed += 1
+                    categoryResults[category] = result
+                    totalJunkSize += result.totalSize
+                    activity.scanProgress = Double(completed) / Double(total)
+                    activity.currentCategory = category.rawValue
+                    submitNext()
+                }
+            }
+
+            activity.scanProgress = 1.0
             scanTicker.path = ""
             scanState = .completed
             loadDiskInfo()
@@ -844,10 +887,11 @@ final class AppState: ObservableObject {
         guard !scanState.isActive else { return }
 
         scanState = .scanning(progress: 0, currentCategory: category.rawValue)
-        scanProgress = 0
+        activity.scanProgress = 0
+        activity.currentCategory = category.rawValue
 
         Task {
-            scanProgress = 0.5
+            activity.scanProgress = 0.5
             clearSelectionState(for: category)
             let result = await scanEngine.scanCategory(category) { [weak self] path in
                 Task { @MainActor [weak self] in
@@ -857,7 +901,7 @@ final class AppState: ObservableObject {
             categoryResults[category] = result
 
             totalJunkSize = categoryResults.values.reduce(0) { $0 + $1.totalSize }
-            scanProgress = 1.0
+            activity.scanProgress = 1.0
             scanTicker.path = ""
             scanState = .completed
         }
@@ -872,13 +916,12 @@ final class AppState: ObservableObject {
         guard !itemsToClean.isEmpty else { return }
 
         scanState = .cleaning(progress: 0)
-        cleanProgress = 0
+        activity.cleanProgress = 0
 
         Task {
             var result = await cleaningEngine.cleanItems(itemsToClean) { [weak self] progress in
                 Task { @MainActor [weak self] in
-                    self?.cleanProgress = progress
-                    self?.scanState = .cleaning(progress: progress)
+                    self?.activity.cleanProgress = progress
                 }
             }
 
@@ -935,13 +978,12 @@ final class AppState: ObservableObject {
         guard !selectedItems.isEmpty else { return }
 
         scanState = .cleaning(progress: 0)
-        cleanProgress = 0
+        activity.cleanProgress = 0
 
         Task {
             var cleanResult = await cleaningEngine.cleanItems(selectedItems) { [weak self] progress in
                 Task { @MainActor [weak self] in
-                    self?.cleanProgress = progress
-                    self?.scanState = .cleaning(progress: progress)
+                    self?.activity.cleanProgress = progress
                 }
             }
 

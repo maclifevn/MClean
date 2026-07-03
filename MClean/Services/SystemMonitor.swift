@@ -39,6 +39,11 @@ final class SystemMonitor: ObservableObject {
     /// Number of live observers; the timer runs only while > 0 so two views
     /// (menu-bar label + dropdown) share one timer and the app idles cleanly.
     private var observerCount = 0
+    /// Observers that display memory/disk (the popover). While zero, each
+    /// tick samples only CPU — the menu-bar title needs nothing else, and
+    /// the per-tick VM stats + volume-capacity read were pure idle cost
+    /// while the popover was closed.
+    private var detailObserverCount = 0
 
     private init() {}
 
@@ -64,8 +69,21 @@ final class SystemMonitor: ObservableObject {
         timer = nil
     }
 
+    /// The popover (which shows memory + disk) came on screen: sample those
+    /// immediately so it opens fresh, then keep sampling them each tick.
+    func startDetail() {
+        detailObserverCount += 1
+        sampleMemory()
+        sampleDisk()
+    }
+
+    func stopDetail() {
+        detailObserverCount = max(0, detailObserverCount - 1)
+    }
+
     private func sample() {
         sampleCPU()
+        guard detailObserverCount > 0 else { return }
         sampleMemory()
         sampleDisk()
     }

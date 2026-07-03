@@ -2,12 +2,13 @@ import Foundation
 
 extension String {
 
+    /// Called once per filesystem entry during app scans, so it must stay
+    /// cheap: one lowercasing pass plus one in-place removal pass, instead of
+    /// four chained replacingOccurrences each allocating a fresh String.
     func normalizedForMatching() -> String {
-        self.lowercased()
-            .replacingOccurrences(of: " ", with: "")
-            .replacingOccurrences(of: "-", with: "")
-            .replacingOccurrences(of: "_", with: "")
-            .replacingOccurrences(of: ".", with: "")
+        var out = self.lowercased()
+        out.removeAll { $0 == " " || $0 == "-" || $0 == "_" || $0 == "." }
+        return out
     }
 
     func strippingTrailingVersion() -> String {

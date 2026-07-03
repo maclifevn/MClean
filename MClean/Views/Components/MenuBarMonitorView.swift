@@ -62,8 +62,8 @@ struct MenuBarMonitorView: View {
         }
         .padding(14)
         .frame(width: 248)
-        .onAppear { monitor.start() }
-        .onDisappear { monitor.stop() }
+        .onAppear { monitor.start(); monitor.startDetail() }
+        .onDisappear { monitor.stopDetail(); monitor.stop() }
     }
 
     private func byteDetail(_ used: Int64, _ total: Int64) -> String {

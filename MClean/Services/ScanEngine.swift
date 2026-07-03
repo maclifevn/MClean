@@ -740,46 +740,49 @@ actor ScanEngine {
               fileManager.isReadableFile(atPath: path) else { return [] }
 
         do {
-            let contents = try fileManager.contentsOfDirectory(atPath: path)
-            for item in contents {
-                let fullPath = (path as NSString).appendingPathComponent(item)
+            // One listing with prefetched attributes replaces the previous
+            // per-entry fileExists + attributesOfItem(x2) + fileModDate chain
+            // (3-4 stat-class syscalls per entry down to the single prefetch).
+            let contents = try fileManager.contentsOfDirectory(
+                at: URL(fileURLWithPath: path),
+                includingPropertiesForKeys: Self.scanEntryKeys,
+                options: []
+            )
+            for entryURL in contents {
+                let fullPath = entryURL.path
                 report(fullPath)
                 if excludedPaths.contains(normalizePath(fullPath)) {
                     continue
                 }
 
-                var isDir: ObjCBool = false
-                guard fileManager.fileExists(atPath: fullPath, isDirectory: &isDir) else { continue }
-
-                // Security: skip symlinks to prevent symlink-following attacks
-                if let attrs = try? fileManager.attributesOfItem(atPath: fullPath),
-                   let fileType = attrs[.type] as? FileAttributeType,
-                   fileType == .typeSymbolicLink {
+                guard let values = try? entryURL.resourceValues(forKeys: Self.scanEntryKeySet) else {
                     continue
                 }
+                // Security: skip symlinks to prevent symlink-following attacks
+                if values.isSymbolicLink ?? false { continue }
 
-                if isDir.boolValue {
+                let name = entryURL.lastPathComponent
+                if values.isDirectory ?? false {
                     let size = directorySize(path: fullPath)
                     if size > 1024 { // Skip tiny entries
                         items.append(CleanableItem(
-                            name: item,
+                            name: name,
                             path: fullPath,
                             size: size,
                             category: category,
                             isSelected: true,
-                            lastModified: fileModDate(path: fullPath)
+                            lastModified: values.contentModificationDate
                         ))
                     }
                 } else {
-                    if let attrs = try? fileManager.attributesOfItem(atPath: fullPath),
-                       let size = attrs[.size] as? Int64, size > 1024 {
+                    if let size = values.fileSize, size > 1024 {
                         items.append(CleanableItem(
-                            name: item,
+                            name: name,
                             path: fullPath,
-                            size: size,
+                            size: Int64(size),
                             category: category,
                             isSelected: true,
-                            lastModified: attrs[.modificationDate] as? Date
+                            lastModified: values.contentModificationDate
                         ))
                     }
                 }
@@ -790,6 +793,13 @@ actor ScanEngine {
 
         return items
     }
+
+    /// Prefetch keys for scanDirectory — declared once so neither the array
+    /// nor the Set is rebuilt per directory or per entry.
+    private static let scanEntryKeys: [URLResourceKey] = [
+        .isDirectoryKey, .isSymbolicLinkKey, .fileSizeKey, .contentModificationDateKey,
+    ]
+    private static let scanEntryKeySet = Set(scanEntryKeys)
 
     private func makeCleanupItem(
         name: String,
@@ -863,7 +873,9 @@ actor ScanEngine {
             if count > 10000 { break } // Safety limit for very large directories
 
             report(fileURL.path)
-            guard let values = try? fileURL.resourceValues(forKeys: [.fileSizeKey, .isRegularFileKey]),
+            // Same key set as the enumerator prefetch, resolved from the URL
+            // cache; the static Set avoids a per-file allocation.
+            guard let values = try? fileURL.resourceValues(forKeys: Self.directorySizeKeySet),
                   let isFile = values.isRegularFile, isFile,
                   let size = values.fileSize else { continue }
             totalSize += Int64(size)
@@ -871,6 +883,8 @@ actor ScanEngine {
 
         return totalSize
     }
+
+    private static let directorySizeKeySet: Set<URLResourceKey> = [.fileSizeKey, .isRegularFileKey]
 
     private func fileModDate(path: String) -> Date? {
         try? fileManager.attributesOfItem(atPath: path)[.modificationDate] as? Date
@@ -887,6 +901,7 @@ actor ScanEngine {
     /// Get local Time Machine snapshots and their sizes
     private func getLocalSnapshots() -> [SnapshotInfo] {
         var snapshots: [SnapshotInfo] = []
+        lazy var snapshotSizes = apfsSnapshotSizes()
 
         let task = Process()
         task.executableURL = URL(fileURLWithPath: "/usr/bin/tmutil")
@@ -919,8 +934,11 @@ actor ScanEngine {
                     }
                 }
 
-                // Get snapshot size via tmutil
-                let sizeBytes = getSnapshotSize(name: trimmed)
+                // Look up the size from the one-shot APFS listing. The lazy
+                // var means diskutil runs at most once per scan instead of
+                // once per snapshot (previously O(n) subprocess spawns, each
+                // parsing the same plist).
+                let sizeBytes = snapshotSizes[trimmed] ?? 0
 
                 if sizeBytes > 0 {
                     snapshots.append(SnapshotInfo(
@@ -937,8 +955,9 @@ actor ScanEngine {
         return snapshots
     }
 
-    /// Get size of a specific local snapshot via APFS snapshot listing
-    private func getSnapshotSize(name: String) -> Int64 {
+    /// One-shot APFS snapshot listing → [snapshot name: data size]. Runs
+    /// diskutil exactly once; callers look sizes up from the returned map.
+    private func apfsSnapshotSizes() -> [String: Int64] {
         let task = Process()
         task.executableURL = URL(fileURLWithPath: "/usr/sbin/diskutil")
         task.arguments = ["apfs", "listSnapshots", "/", "-plist"]
@@ -952,24 +971,22 @@ actor ScanEngine {
             let data = pipe.fileHandleForReading.readDataToEndOfFile()
             guard let plist = try? PropertyListSerialization.propertyList(from: data, format: nil) as? [String: Any],
                   let snapshots = plist["Snapshots"] as? [[String: Any]] else {
-                Logger.shared.log("Could not parse APFS snapshot plist for \(name)", level: .info)
-                return 0
+                Logger.shared.log("Could not parse APFS snapshot plist", level: .info)
+                return [:]
             }
 
+            var sizes: [String: Int64] = [:]
             for snapshot in snapshots {
                 if let snapshotName = snapshot["SnapshotName"] as? String,
-                   snapshotName == name,
                    let dataSize = snapshot["DataSize"] as? Int64 {
-                    return dataSize
+                    sizes[snapshotName] = dataSize
                 }
             }
-
-            Logger.shared.log("Snapshot \(name) not found in APFS listing", level: .info)
+            return sizes
         } catch {
             Logger.shared.log("diskutil apfs listSnapshots failed: \(error.localizedDescription)", level: .warning)
+            return [:]
         }
-
-        return 0
     }
 
     /// Calculate total local snapshot size from disk usage difference

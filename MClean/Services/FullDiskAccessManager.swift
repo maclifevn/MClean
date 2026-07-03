@@ -69,6 +69,12 @@ final class FullDiskAccessManager {
     /// even though we never use them — confusing and a privacy regression.
     func triggerRegistration() {
         DispatchQueue.global(qos: .utility).async {
+            // Once access is granted the bundle is already registered (and
+            // the grant proves it) — skip the probe sweep on every warm
+            // launch. hasFullDiskAccess short-circuits on its first
+            // successful read, so the granted path costs a single syscall.
+            guard !self.hasFullDiskAccess else { return }
+
             let home = FileManager.default.homeDirectoryForCurrentUser.path
             // FDA-only probes. Each path here is read-gated by
             // SystemPolicyAllFiles, nothing else.

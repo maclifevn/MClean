@@ -428,52 +428,12 @@ struct DashboardView: View {
     // MARK: - Scanning state
 
     private var scanningHero: some View {
+        // The per-tick progress values live on the isolated ScanActivity
+        // object, so only this hero's content re-renders as the scan
+        // advances — not the whole dashboard.
         CardSurface(padding: 24, accent: Tint.blue, elevation: .raised, material: .ultraThinMaterial) {
-            HStack(alignment: .center, spacing: 28) {
-                ScanningGauge(progress: appState.scanProgress)
-                    .frame(width: 180, height: 180)
-                VStack(alignment: .leading, spacing: 10) {
-                    HStack(spacing: 8) {
-                        sparklesIcon
-                        Text("Scanning your Mac")
-                            .font(.system(size: 22, weight: .bold))
-                    }
-
-                    // Category line slides up as the scan advances.
-                    Text(currentlyInText)
-                        .font(.system(size: 13))
-                        .foregroundStyle(.secondary)
-                        .id(appState.currentScanCategory)
-                        .transition(
-                            reduceMotion
-                                ? .opacity
-                                : .asymmetric(
-                                    insertion: .move(edge: .bottom).combined(with: .opacity),
-                                    removal: .move(edge: .top).combined(with: .opacity)
-                                )
-                        )
-
-                    ShimmerProgressBar(progress: appState.scanProgress)
-                        .frame(maxWidth: 320)
-                        .padding(.top, 2)
-
-                    // Live file-path ticker — the "it's really working"
-                    // signal. Observes the standalone ScanProgressTicker so the
-                    // ~10Hz path churn re-renders only this label, not the whole
-                    // dashboard (issues #119, #120).
-                    ScanPathTicker(ticker: appState.scanTicker)
-                }
-                .animation(reduceMotion ? nil : .easeOut(duration: 0.18), value: appState.currentScanCategory)
-                Spacer(minLength: 0)
-            }
+            ScanningHeroContent(activity: appState.activity, ticker: appState.scanTicker)
         }
-    }
-
-    private var currentlyInText: String {
-        String(
-            format: String(localized: "Currently in: %@"),
-            String(localized: String.LocalizationValue(appState.currentScanCategory))
-        )
     }
 
     private var liveResults: some View {
@@ -599,43 +559,10 @@ struct DashboardView: View {
         }
     }
 
-    @ViewBuilder
-    private var sparklesIcon: some View {
-        let base = Image(systemName: "sparkles")
-            .font(.system(size: 18, weight: .semibold))
-            .foregroundStyle(
-                LinearGradient(colors: [Tint.blue, Tint.purple],
-                               startPoint: .topLeading, endPoint: .bottomTrailing)
-            )
-        if #available(macOS 14.0, *) {
-            base.symbolEffect(.variableColor.iterative, options: .repeating)
-        } else {
-            base
-        }
-    }
-
     private var cleaningHero: some View {
         CardSurface(padding: 24, accent: Tint.orange, elevation: .raised, material: .ultraThinMaterial) {
-            HStack(alignment: .center, spacing: 28) {
-                ScanningGauge(progress: appState.cleanProgress, tint: Tint.orange, label: "CLEANING")
-                    .frame(width: 180, height: 180)
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("Cleaning…")
-                        .font(.system(size: 22, weight: .bold))
-                    Text(percentCompleteText)
-                        .font(.system(size: 13))
-                        .foregroundStyle(.secondary)
-                    ShimmerProgressBar(progress: appState.cleanProgress, tint: Tint.orange)
-                        .frame(maxWidth: 320)
-                        .padding(.top, 2)
-                }
-                Spacer(minLength: 0)
-            }
+            CleaningHeroContent(activity: appState.activity)
         }
-    }
-
-    private var percentCompleteText: String {
-        String(format: String(localized: "%lld%% complete"), Int64(appState.cleanProgress * 100))
     }
 
     /// Convert the medal's frame (in dashboard coordinates) into a UnitPoint
@@ -972,5 +899,101 @@ struct AdaptiveStack<Content: View>: View {
         } else {
             HStack(alignment: .center, spacing: spacing) { content }
         }
+    }
+}
+
+/// Scanning hero body. Observes the isolated ScanActivity (per-category
+/// progress) and ScanProgressTicker (~10Hz path) directly, so scan ticks
+/// re-render only this content — the rest of the dashboard stays still.
+private struct ScanningHeroContent: View {
+    @ObservedObject var activity: ScanActivity
+    let ticker: ScanProgressTicker
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    var body: some View {
+        HStack(alignment: .center, spacing: 28) {
+            ScanningGauge(progress: activity.scanProgress)
+                .frame(width: 180, height: 180)
+            VStack(alignment: .leading, spacing: 10) {
+                HStack(spacing: 8) {
+                    sparklesIcon
+                    Text("Scanning your Mac")
+                        .font(.system(size: 22, weight: .bold))
+                }
+
+                // Category line slides up as the scan advances.
+                Text(currentlyInText)
+                    .font(.system(size: 13))
+                    .foregroundStyle(.secondary)
+                    .id(activity.currentCategory)
+                    .transition(
+                        reduceMotion
+                            ? .opacity
+                            : .asymmetric(
+                                insertion: .move(edge: .bottom).combined(with: .opacity),
+                                removal: .move(edge: .top).combined(with: .opacity)
+                            )
+                    )
+
+                ShimmerProgressBar(progress: activity.scanProgress)
+                    .frame(maxWidth: 320)
+                    .padding(.top, 2)
+
+                // Live file-path ticker — the "it's really working" signal
+                // (issues #119, #120).
+                ScanPathTicker(ticker: ticker)
+            }
+            .animation(reduceMotion ? nil : .easeOut(duration: 0.18), value: activity.currentCategory)
+            Spacer(minLength: 0)
+        }
+    }
+
+    private var currentlyInText: String {
+        String(
+            format: String(localized: "Currently in: %@"),
+            String(localized: String.LocalizationValue(activity.currentCategory))
+        )
+    }
+
+    @ViewBuilder
+    private var sparklesIcon: some View {
+        let base = Image(systemName: "sparkles")
+            .font(.system(size: 18, weight: .semibold))
+            .foregroundStyle(
+                LinearGradient(colors: [Tint.blue, Tint.purple],
+                               startPoint: .topLeading, endPoint: .bottomTrailing)
+            )
+        if #available(macOS 14.0, *) {
+            base.symbolEffect(.variableColor.iterative, options: .repeating)
+        } else {
+            base
+        }
+    }
+}
+
+/// Cleaning hero body — same isolation as ScanningHeroContent.
+private struct CleaningHeroContent: View {
+    @ObservedObject var activity: ScanActivity
+
+    var body: some View {
+        HStack(alignment: .center, spacing: 28) {
+            ScanningGauge(progress: activity.cleanProgress, tint: Tint.orange, label: "CLEANING")
+                .frame(width: 180, height: 180)
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Cleaning…")
+                    .font(.system(size: 22, weight: .bold))
+                Text(percentCompleteText)
+                    .font(.system(size: 13))
+                    .foregroundStyle(.secondary)
+                ShimmerProgressBar(progress: activity.cleanProgress, tint: Tint.orange)
+                    .frame(maxWidth: 320)
+                    .padding(.top, 2)
+            }
+            Spacer(minLength: 0)
+        }
+    }
+
+    private var percentCompleteText: String {
+        String(format: String(localized: "%lld%% complete"), Int64(activity.cleanProgress * 100))
     }
 }
