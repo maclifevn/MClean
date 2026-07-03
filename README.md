@@ -143,7 +143,7 @@ Rất hoan nghênh pull request. Xem [CONTRIBUTING.md](CONTRIBUTING.md).
 Đặc biệt mong muốn:
 - Bộ lọc kích thước/ngày theo hạng mục
 - Mở rộng phạm vi kiểm thử XCTest cho `AppState` và bộ máy quét
-- Thêm ngôn ngữ (hiện có: vi, en, ar, es, ja, pt-BR, zh-Hans, zh-Hant)
+- Thêm ngôn ngữ (hiện có: vi, en, ja, zh-Hans, zh-Hant)
 
 ## Giấy phép
 

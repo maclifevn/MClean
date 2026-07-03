@@ -1,8 +1,4 @@
 name: MClean
-packages:
-  Sparkle:
-    url: https://github.com/sparkle-project/Sparkle
-    from: 2.0.0
 options:
   bundleIdPrefix: com.maclife
   deploymentTarget:
@@ -45,9 +41,6 @@ targets:
     platform: macOS
     sources:
       - MClean
-    dependencies:
-      - package: Sparkle
-        product: Sparkle
     settings:
       base:
         PRODUCT_NAME: MClean

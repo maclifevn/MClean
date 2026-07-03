@@ -12,29 +12,11 @@
 		<data>
 		ZpzuI22Tj+HfXVcF6QOARJhBub4=
 		</data>
-		<key>Resources/ar.lproj/Localizable.strings</key>
-		<dict>
-			<key>hash</key>
-			<data>
-			tl43sbcI9rJ39xcaS1zf8Kxmm24=
-			</data>
-			<key>optional</key>
-			<true/>
-		</dict>
 		<key>Resources/en.lproj/Localizable.strings</key>
 		<dict>
 			<key>hash</key>
 			<data>
-			sbznA66mM6LEgJDspFQuGHuRDxc=
-			</data>
-			<key>optional</key>
-			<true/>
-		</dict>
-		<key>Resources/es.lproj/Localizable.strings</key>
-		<dict>
-			<key>hash</key>
-			<data>
-			q5bczExga1OOXa0GHhpuLISl/mE=
+			gMT/sFPjP3/yKv/426LtxdJr3JI=
 			</data>
 			<key>optional</key>
 			<true/>
@@ -43,16 +25,7 @@
 		<dict>
 			<key>hash</key>
 			<data>
-			F+WqG3XtxeB4oNdLy3ui1mNX58Y=
-			</data>
-			<key>optional</key>
-			<true/>
-		</dict>
-		<key>Resources/pt-BR.lproj/Localizable.strings</key>
-		<dict>
-			<key>hash</key>
-			<data>
-			IFFO05wzZsGJLZc7uskUpsyZ+PI=
+			zagbh8mKxkzCTVHMKEbaOR5k1zY=
 			</data>
 			<key>optional</key>
 			<true/>
@@ -61,7 +34,7 @@
 		<dict>
 			<key>hash</key>
 			<data>
-			pH2oHqaIan08Ej+jL4Bvsoj8Sr8=
+			XIewoNXAtjUhI4yuJyB9UuiecDA=
 			</data>
 			<key>optional</key>
 			<true/>
@@ -70,7 +43,7 @@
 		<dict>
 			<key>hash</key>
 			<data>
-			3WEr49HA0oI5EfKo/U6wlqROQ0E=
+			t+KY0j72SO9bKWW63wNsc1NkNJk=
 			</data>
 			<key>optional</key>
 			<true/>
@@ -79,7 +52,7 @@
 		<dict>
 			<key>hash</key>
 			<data>
-			NVeQWkDLIx1pVZPNh2046uzaX58=
+			al5rtUoPfNqR+23e8/nHs84u3gg=
 			</data>
 			<key>optional</key>
 			<true/>
@@ -87,15 +60,6 @@
 	</dict>
 	<key>files2</key>
 	<dict>
-		<key>Frameworks/Sparkle.framework</key>
-		<dict>
-			<key>cdhash</key>
-			<data>
-			xrpmlzD8L3DHFhvMJgipJRX5YHk=
-			</data>
-			<key>requirement</key>
-			<string>identifier "org.sparkle-project.Sparkle" and anchor apple generic and certificate leaf[subject.CN] = "Apple Development: maclife.vn@gmail.com (3CJM7Z7Y9A)" and certificate 1[field.1.2.840.113635.100.6.2.1] /* exists */</string>
-		</dict>
 		<key>Resources/AppIcon.icns</key>
 		<dict>
 			<key>hash2</key>
@@ -110,29 +74,11 @@
 			Y87U7gEWEFwKczZjsZlbOYhRYvl7TasauNoNGdf1Gi0=
 			</data>
 		</dict>
-		<key>Resources/ar.lproj/Localizable.strings</key>
-		<dict>
-			<key>hash2</key>
-			<data>
-			9Gy1Wf2uci7DD8B8GspyRT7BJHZFUIiGK8nbz1Hqei4=
-			</data>
-			<key>optional</key>
-			<true/>
-		</dict>
 		<key>Resources/en.lproj/Localizable.strings</key>
 		<dict>
 			<key>hash2</key>
 			<data>
-			QmuXzW0BKzUDKIfW3gvK0TZlAniFBQv4q/wS7cJirNw=
-			</data>
-			<key>optional</key>
-			<true/>
-		</dict>
-		<key>Resources/es.lproj/Localizable.strings</key>
-		<dict>
-			<key>hash2</key>
-			<data>
-			7JRWDwKEzf71GDt/9rs0shZLEZV3zlU1ngmnWwsY5VI=
+			YPRbt3B6crkTLkrY2n/YrsTninMPG6x4wb4oTOrTu3k=
 			</data>
 			<key>optional</key>
 			<true/>
@@ -141,16 +87,7 @@
 		<dict>
 			<key>hash2</key>
 			<data>
-			HRv68k5iSlYBtwiCL6cUIRDAikcstpnafWmWnsmxQmk=
-			</data>
-			<key>optional</key>
-			<true/>
-		</dict>
-		<key>Resources/pt-BR.lproj/Localizable.strings</key>
-		<dict>
-			<key>hash2</key>
-			<data>
-			LFCPqsKO+RHQEPZhYck4MGUiQSDbHi0DlGP0knPgTvQ=
+			tbBUcTdWgG5Rz2PXUASndZOeSXuJ1e0ftjzt6w9E0OA=
 			</data>
 			<key>optional</key>
 			<true/>
@@ -159,7 +96,7 @@
 		<dict>
 			<key>hash2</key>
 			<data>
-			7FBtM0+7JDVsxi2/wY/Nwpa70CqBGHPGs2k07Vh7xTc=
+			aPtXjlihEGWbu8N87GSaCa/zRKSY3D3d8F388sl3O/w=
 			</data>
 			<key>optional</key>
 			<true/>
@@ -168,7 +105,7 @@
 		<dict>
 			<key>hash2</key>
 			<data>
-			Thx+1/be49FNoULhMO0HlWEaj8yLbmQey3JOKXCuuVo=
+			WKdmRr2wnpgHkQxSu1gj6QkWoeH35K7DN+XDasH9hcU=
 			</data>
 			<key>optional</key>
 			<true/>
@@ -177,7 +114,7 @@
 		<dict>
 			<key>hash2</key>
 			<data>
-			+1S8wj+Ebm01EDwMqCxsDV5vI38A/tliTCJSQe+dXhM=
+			+1NVOyPno8kWK6BhhNGB8TrRERyHPySTOCLJcGtZ4Z4=
 			</data>
 			<key>optional</key>
 			<true/>
