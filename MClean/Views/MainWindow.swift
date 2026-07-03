@@ -84,7 +84,10 @@ struct MainWindow: View {
             } header: { sectionLabel("Overview") }
 
             Section {
-                navRow(section: .apps, label: "Installed Apps",
+                // "App Uninstaller", not "Installed Apps": the row IS the
+                // uninstall feature, and users looking to remove an app
+                // scanned right past the old descriptive name (user report).
+                navRow(section: .apps, label: "App Uninstaller",
                        icon: "square.grid.2x2.fill", tint: Tint.purple,
                        badge: appState.installedApps.isEmpty ? nil : "\(appState.installedApps.count)")
                 navRow(section: .orphans, label: "Orphaned Files",
