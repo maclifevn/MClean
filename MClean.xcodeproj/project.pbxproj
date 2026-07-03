@@ -124,6 +124,7 @@
 		913E3064AA9BD7BE94A315CF /* MenuBarController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuBarController.swift; sourceTree = "<group>"; };
 		92259B3E9F4468865F15DEEC /* AppearancePill.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppearancePill.swift; sourceTree = "<group>"; };
 		9F04B811BB0012F6D2F07F91 /* en */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = en; path = en.lproj/Localizable.strings; sourceTree = "<group>"; };
+		9240D3D4429AA2FF3BAA7363 /* vi */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = vi; path = vi.lproj/Localizable.strings; sourceTree = "<group>"; };
 		9F510F232341EE18F11DC934 /* MainWindow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainWindow.swift; sourceTree = "<group>"; };
 		A27DB5A70FA829B6C3ED0AC3 /* MenuBarMonitorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuBarMonitorView.swift; sourceTree = "<group>"; };
 		A711CDF5285F68775D9B5513 /* ScanEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScanEngine.swift; sourceTree = "<group>"; };
@@ -428,6 +429,7 @@
 				"pt-BR",
 				"zh-Hans",
 				"zh-Hant",
+				vi,
 			);
 			mainGroup = 13CF0676D0E93925F46C13AA;
 			minimizedProjectReferenceProxies = 1;
@@ -546,6 +548,7 @@
 				8D5E63D733D1A3BDEDF4DCA5 /* pt-BR */,
 				2641C6376DD6F5889F35510E /* zh-Hans */,
 				02E502E2B5C6AECC76E5CFEF /* zh-Hant */,
+				9240D3D4429AA2FF3BAA7363 /* vi */,
 			);
 			name = Localizable.strings;
 			sourceTree = "<group>";

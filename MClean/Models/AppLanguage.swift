@@ -9,6 +9,7 @@ enum AppLanguage: String, CaseIterable, Identifiable {
     case portugueseBrazil = "pt-BR"
     case simplifiedChinese = "zh-Hans"
     case traditionalChinese = "zh-Hant"
+    case vietnamese = "vi"
 
     static let preferenceKey = "settings.general.appLanguage"
 
@@ -24,6 +25,7 @@ enum AppLanguage: String, CaseIterable, Identifiable {
         case .portugueseBrazil: return "Portuguese (Brazil)"
         case .simplifiedChinese: return "Chinese (Simplified)"
         case .traditionalChinese: return "Chinese (Traditional)"
+        case .vietnamese: return "Vietnamese"
         }
     }
 
