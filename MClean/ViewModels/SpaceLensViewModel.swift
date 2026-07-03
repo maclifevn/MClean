@@ -66,7 +66,9 @@ final class SpaceLensViewModel: ObservableObject {
     }
 
     func scanHomeFolder() {
-        scan(FileManager.default.homeDirectoryForCurrentUser)
+        let access = SandboxAccessManager.shared
+        guard access.hasFullScanAccess || access.requestFullScanAccess() else { return }
+        scan(SandboxAccessManager.homeURL)
     }
 
     func scan(_ url: URL) {

@@ -15,6 +15,15 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSWindow.allowsAutomaticWindowTabbing = false
+        // Appearance is now fully system-native; discard the retired manual
+        // light/dark override from older builds.
+        UserDefaults.standard.removeObject(forKey: "MClean.Appearance")
+
+        // The status item is a core quick-access surface for new installs.
+        // `register` preserves an existing explicit opt-out.
+        UserDefaults.standard.register(defaults: [
+            "settings.general.menuBarMonitor": true,
+        ])
 
         // Install the menu-bar monitor if the user has it enabled. Never under
         // XCTest — the status-item machinery would stall the test-host run loop.
@@ -24,10 +33,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 self, selector: #selector(syncMenuBarMonitor),
                 name: .mCleanMenuBarMonitorChanged, object: nil
             )
+            syncDockIconVisibility()
+            NotificationCenter.default.addObserver(
+                self, selector: #selector(syncDockIconVisibility),
+                name: .mCleanDockIconChanged, object: nil
+            )
         }
-        // Touch TCC-protected paths so macOS registers MClean in the
-        // Full Disk Access pane on first launch (fixes issue #75).
-        FullDiskAccessManager.shared.triggerRegistration()
         // Register the Finder Services provider so "Uninstall with MClean"
         // appears when an .app bundle is right-clicked (issue #109).
         NSApp.servicesProvider = self
@@ -58,6 +69,20 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         )
     }
 
+    /// Match the activation policy to the "Hide Dock icon" Settings toggle.
+    /// `.accessory` removes MClean from the Dock and the ⌘Tab switcher while
+    /// its windows keep working. Applied at launch and whenever the toggle
+    /// flips, so no relaunch is needed.
+    @objc func syncDockIconVisibility() {
+        let hide = UserDefaults.standard.bool(forKey: "settings.general.hideDockIcon")
+        let policy: NSApplication.ActivationPolicy = hide ? .accessory : .regular
+        guard NSApp.activationPolicy() != policy else { return }
+        NSApp.setActivationPolicy(policy)
+        // Switching to .accessory drops key-window status; bring MClean back
+        // to the front so the Settings window the user is in stays focused.
+        NSApp.activate(ignoringOtherApps: true)
+    }
+
     /// Create or tear down the menu-bar status item to match the current
     /// Settings toggle. Posted to whenever the toggle flips so it takes effect
     /// without a relaunch.
@@ -76,13 +101,16 @@ extension Notification.Name {
     /// Posted when the "Show system monitor in menu bar" Settings toggle flips,
     /// so AppDelegate can add/remove the status item live.
     static let mCleanMenuBarMonitorChanged = Notification.Name("MClean.MenuBarMonitorChanged")
+    /// Posted when the "Hide Dock icon" Settings toggle flips, so AppDelegate
+    /// can switch the activation policy live.
+    static let mCleanDockIconChanged = Notification.Name("MClean.DockIconChanged")
+    static let mCleanSmartScanRequested = Notification.Name("MClean.SmartScanRequested")
 }
 
 @main
 struct MCleanApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
     @StateObject private var appState = AppState()
-    @StateObject private var theme = ThemeManager.shared
     @AppStorage("MClean.OnboardingComplete") private var onboardingComplete = false
 
     init() {
@@ -101,30 +129,33 @@ struct MCleanApp: App {
                 if onboardingComplete {
                     MainWindow()
                         .environmentObject(appState)
-                        .frame(minWidth: 900, minHeight: 600)
+                        .frame(width: 1000, height: 680)
                 } else {
                     OnboardingView(isComplete: $onboardingComplete)
                 }
             }
-            .environmentObject(theme)
-            .preferredColorScheme(theme.appearance.colorScheme)
             // Record the openWindow action so the menu-bar popover can reopen
             // this window after it's been closed (the popover lives outside the
             // scene graph and can't use openWindow itself).
             .background(WindowOpenerCapture())
+            .mCleanWindowChrome()
         }
         .windowStyle(.automatic)
         .windowToolbarStyle(.unified)
-        .windowResizability(.contentMinSize)
+        .windowResizability(.contentSize)
         .defaultSize(width: 1000, height: 680)
         .commands {
             CommandGroup(replacing: .newItem) {}
+            // The App Store handles updates itself, and pointing users at
+            // GitHub releases from a Store build violates review guidelines.
+            #if !APPSTORE
             CommandMenu("Updates") {
                 Button("Check for Updates") {
                     UpdateService.shared.checkForUpdates()
                 }
                 .keyboardShortcut("u", modifiers: [.command, .shift])
             }
+            #endif
         }
 
         Settings {
@@ -138,5 +169,20 @@ struct MCleanApp: App {
         // unconditional one sets up status-item machinery that hangs the XCTest
         // host. The AppKit controller is only created when enabled and never
         // under tests, sidestepping both problems.
+    }
+}
+
+private extension View {
+    @ViewBuilder
+    func mCleanWindowChrome() -> some View {
+        if #available(macOS 15.0, *) {
+            // Keep the logical window title for macOS/window management, but
+            // don't draw a standalone "MClean" title in the toolbar. Feature
+            // panes own their own headings/actions, which keeps Dashboard and
+            // Space Lens visually aligned with the other tabs.
+            self.toolbar(removing: .title)
+        } else {
+            self
+        }
     }
 }

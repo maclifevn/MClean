@@ -23,14 +23,17 @@ struct AppListView: View {
     }
 
     var body: some View {
-        HSplitView {
-            // Cap the left pane's maxWidth so dragging the splitter cannot
-            // push it past half the window and break the layout (#60).
+        HStack(spacing: 0) {
+            // This is intentionally fixed instead of user-resizable. Restored
+            // HSplitView positions could compress the pane below its declared
+            // minimum or let it crowd the app-wide sidebar.
             appTable
-                .frame(minWidth: 300, idealWidth: 380, maxWidth: 600)
+                .frame(width: 396)
+
+            Divider()
 
             fileDetail
-                .frame(minWidth: 300)
+                .frame(minWidth: 340, maxWidth: .infinity)
         }
         .searchable(text: $searchText, prompt: "Search apps")
         .navigationTitle(installedAppsTitle)
@@ -76,18 +79,28 @@ struct AppListView: View {
                 Table(filteredApps, selection: $selection, sortOrder: $sortOrder) {
                     TableColumn("Application", value: \.appName) { app in
                         HStack(spacing: 8) {
-                            HoverScaleIcon(icon: app.icon)
+                            Image(nsImage: app.icon)
+                                .resizable()
+                                .interpolation(.high)
+                                .frame(width: 20, height: 20)
                             Text(app.appName)
+                                .lineLimit(1)
+                                .truncationMode(.tail)
                         }
+                        .help(app.appName)
                     }
-                    .width(min: 150)
+                    .width(min: 210, ideal: 238, max: 244)
 
                     TableColumn("Size", value: \.size) { app in
                         Text(app.formattedSize)
+                            .font(.system(size: 13))
                             .monospacedDigit()
                             .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                            .frame(maxWidth: .infinity, alignment: .trailing)
+                            .help(app.formattedSize)
                     }
-                    .width(ideal: 70)
+                    .width(min: 118, ideal: 118, max: 118)
                 }
                 .onChange(of: selection) { newValue in
                     guard let id = newValue,
@@ -130,22 +143,5 @@ struct AppListView: View {
                 tint: Tint.purple
             )
         }
-    }
-}
-
-/// App icon that scales up slightly on hover inside a Table cell.
-private struct HoverScaleIcon: View {
-    let icon: NSImage
-
-    @State private var hovering = false
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-
-    var body: some View {
-        Image(nsImage: icon)
-            .resizable()
-            .frame(width: 20, height: 20)
-            .scaleEffect(hovering && !reduceMotion ? 1.12 : 1)
-            .animation(reduceMotion ? nil : MotionTokens.snappy, value: hovering)
-            .onHover { hovering = $0 }
     }
 }

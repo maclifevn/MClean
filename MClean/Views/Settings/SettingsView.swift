@@ -40,11 +40,13 @@ struct GeneralSettingsView: View {
     @AppStorage("settings.general.launchAtLogin") private var launchAtLogin = false
     @AppStorage("settings.general.searchSensitivity") private var sensitivity: SearchSensitivity = .enhanced
     @AppStorage("settings.general.confirmBeforeDelete") private var confirmBeforeDelete = true
-    @AppStorage("settings.general.menuBarMonitor") private var menuBarMonitor = false
+    @AppStorage("settings.general.menuBarMonitor") private var menuBarMonitor = true
+    @AppStorage("settings.general.hideDockIcon") private var hideDockIcon = false
     @AppStorage(Haptics.soundEffectsKey) private var soundEffects = true
     @AppStorage(AppLanguage.preferenceKey) private var appLanguageRaw = AppLanguage.current.rawValue
     @State private var languageNeedsRelaunch = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @ObservedObject private var sandboxAccess = SandboxAccessManager.shared
 
     var body: some View {
         Form {
@@ -94,6 +96,40 @@ struct GeneralSettingsView: View {
                     .foregroundStyle(.secondary)
             }
 
+            Section("Dock") {
+                Toggle("Hide Dock icon", isOn: hideDockIconBinding)
+                Text("Hides MClean from the Dock and the ⌘Tab app switcher. Reopen it from the menu-bar monitor or by launching MClean again.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            Section("Folder Access") {
+                if !sandboxAccess.hasFullScanAccess {
+                    Text("Select the startup disk to preserve the original Smart Scan coverage. macOS asks you to confirm it in the native file picker.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                } else {
+                    Label("All original scan locations are available", systemImage: "checkmark.shield.fill")
+                        .foregroundStyle(Tint.green)
+                    ForEach(sandboxAccess.authorizedURLs, id: \.path) { url in
+                        Text(url.path)
+                            .lineLimit(1)
+                            .truncationMode(.middle)
+                            .help(url.path)
+                    }
+                }
+                HStack {
+                    if !sandboxAccess.hasFullScanAccess {
+                        Button("Allow Full Scan…") { _ = sandboxAccess.requestFullScanAccess() }
+                            .buttonStyle(.borderedProminent)
+                    }
+                    Button("Add Folder…") { _ = sandboxAccess.chooseFolders() }
+                    if sandboxAccess.hasAuthorizedFolders {
+                        Button("Revoke Access", role: .destructive) { sandboxAccess.revokeAll() }
+                    }
+                }
+            }
+
             Section("Sound") {
                 Toggle("Play sound effects", isOn: $soundEffects)
             }
@@ -105,6 +141,17 @@ struct GeneralSettingsView: View {
         .formStyle(.grouped)
         .animation(reduceMotion ? nil : .spring(response: 0.35, dampingFraction: 0.85),
                    value: languageNeedsRelaunch)
+    }
+
+    private var hideDockIconBinding: Binding<Bool> {
+        Binding(
+            get: { hideDockIcon },
+            set: { newValue in
+                hideDockIcon = newValue
+                // Tell AppDelegate to switch the activation policy live.
+                NotificationCenter.default.post(name: .mCleanDockIconChanged, object: nil)
+            }
+        )
     }
 
     private var menuBarMonitorBinding: Binding<Bool> {
@@ -330,14 +377,10 @@ struct AboutSettingsView: View {
         Form {
             Section {
                 HStack {
-                    if let appIcon = NSImage(named: "AppIcon") {
-                        Image(nsImage: appIcon)
-                            .resizable()
-                            .frame(width: 64, height: 64)
-                    }
+                    MCleanAppIcon(size: 64, shadow: true)
                     VStack(alignment: .leading, spacing: 4) {
                         Text("MClean")
-                            .font(.title2.bold())
+                            .font(.title2.weight(.semibold))
                         Text(
                             String(
                                 format: String(localized: "Version %@"),
@@ -353,8 +396,8 @@ struct AboutSettingsView: View {
             }
 
             Section {
-                Link("GitHub Repository", destination: URL(string: "https://github.com/maclifevn/MClean")!)
-                Link("Report an Issue", destination: URL(string: "https://github.com/maclifevn/MClean/issues")!)
+                Link("GitHub Repository", destination: URL(string: "https://github.com/PhamHungTien/MClean")!)
+                Link("Report an Issue", destination: URL(string: "https://github.com/PhamHungTien/MClean/issues")!)
             }
 
             Section {
@@ -373,7 +416,7 @@ struct AboutSettingsView: View {
                         )
                     VStack(alignment: .leading, spacing: 6) {
                         Text("Buy me a coffee ☕")
-                            .font(.system(size: 14, weight: .bold))
+                            .font(.headline)
                         Text("If MClean is useful to you, a small donation keeps it going. Thank you!")
                             .font(.caption)
                             .foregroundStyle(.secondary)

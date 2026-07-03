@@ -15,8 +15,8 @@ final class SpaceLensNode: Identifiable, @unchecked Sendable {
     /// Packages (.app and friends) size their contents but expose no
     /// children — they drill like a single file, matching Finder semantics.
     let isPackage: Bool
-    /// The directory could not be listed (missing Full Disk Access or POSIX
-    /// permissions); its size is whatever was reachable, possibly zero.
+    /// The directory could not be listed because macOS denied access; its size
+    /// is whatever was reachable, possibly zero.
     var isAccessDenied: Bool = false
     private(set) var size: Int64
     /// Sorted descending by size. Contains directories and files at or above

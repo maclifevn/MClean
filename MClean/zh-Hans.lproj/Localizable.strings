@@ -8,15 +8,11 @@
 "MClean" = "MClean";
 "Ready to clean" = "可以清理";
 "Limited access" = "访问受限";
-"Full Disk Access granted" = "已授予完整磁盘访问权限";
-"Grant FDA in Settings" = "在“设置”中授予完整磁盘访问";
 "Select a category from the sidebar to get started." = "从侧边栏选择一个类别开始使用。";
 
-/* FDA toast + clean error alert (MainWindow) */
 "Couldn't clean everything" = "无法清理全部";
 "Open System Settings" = "打开“系统设置”";
 "OK" = "好";
-"Full Disk Access required" = "需要完整磁盘访问权限";
 "macOS blocks MClean from cleaning caches and uninstalling apps until you grant access." = "在你授予访问权限之前,macOS 会阻止 MClean 清理缓存和卸载应用。";
 "Grant Access" = "授予访问";
 
@@ -42,7 +38,6 @@
 "Found so far" = "目前发现";
 "By category" = "按类别";
 "%@ is using %@" = "%@ 占用 %@";
-"Grant Full Disk Access for full results" = "授予完整磁盘访问以获得完整结果";
 "Without it, most caches and uninstall flows fail." = "没有它,大多数缓存清理和卸载流程都会失败。";
 "Action" = "操作";
 "Scanning your Mac" = "正在扫描你的 Mac";
@@ -132,11 +127,8 @@
 "Remove apps and all their files" = "删除应用及其所有文件";
 "Orphan Finder" = "孤立文件查找";
 "Find leftovers from deleted apps" = "查找已删除应用的残留";
-"Full Disk Access" = "完整磁盘访问";
-"MClean needs Full Disk Access to uninstall apps, find leftover files, and clean protected caches." = "MClean 需要完整磁盘访问以卸载应用、查找残留文件并清理受保护的缓存。";
 "We'll guide you through the next steps." = "我们将引导你完成接下来的步骤。";
 "In System Settings, do this:" = "在“系统设置”中执行以下操作:";
-"Privacy & Security → Full Disk Access" = "隐私与安全性 → 完整磁盘访问";
 "Find **MClean** and turn the toggle on" = "找到 **MClean** 并打开开关";
 "Authenticate with Touch ID or your password" = "使用触控 ID 或密码进行验证";
 "Reopen Settings" = "重新打开“设置”";
@@ -150,7 +142,6 @@
 "MClean can now manage protected files." = "MClean 现在可以管理受保护的文件。";
 "You're Ready" = "已准备就绪";
 "%lld/%lld protected locations accessible" = "可访问的受保护位置 %lld/%lld";
-"Some features will be limited. You can grant Full Disk Access later in System Settings." = "部分功能将受限。你可以稍后在“系统设置”中授予完整磁盘访问。";
 "Trash" = "废纸篓";
 "Mail Data" = "邮件数据";
 "Safari Data" = "Safari 数据";
@@ -261,10 +252,6 @@
 "Found %@ of junk files." = "发现 %@ 的垃圾文件。";
 
 /* Permission Sheet */
-"Grant Full Disk Access" = "授予完全磁盘访问权限";
-"%lld item(s) need Full Disk Access" = "%lld 个项目需要完全磁盘访问权限";
-"Uninstalling %@: %lld file(s) need Full Disk Access" = "卸载 %@：%lld 个文件需要完全磁盘访问权限";
-"%lld item(s) need Full Disk Access to remove. Tap Grant Access to fix in one step." = "%lld 个项目需要完全磁盘访问权限才能删除。轻点「授予访问权限」一步解决。";
 "Couldn't remove %@%@. They may be in use or protected by macOS." = "无法删除 %@%@。它们可能正在使用或受 macOS 保护。";
 " and %lld more" = " 还有 %lld 个";
 "Access granted. Retrying…" = "已授予访问权限。正在重试…";
@@ -324,7 +311,6 @@
 
 /* Drag handle */
 "Drag to the Settings list" = "拖到设置列表";
-"Drag this icon into the Full Disk Access list in System Settings." = "将此图标拖入系统设置中的完整磁盘访问列表。";
 "Tip: drag the icon on the left straight into the list." = "提示：把左侧图标直接拖入列表。";
 "Or drag the icon on the left straight into Settings." = "或者把左侧图标直接拖入设置。";
 
@@ -367,9 +353,12 @@
 "Show system monitor in menu bar" = "在菜单栏中显示系统监视器";
 "Live CPU, memory, and disk meters in the menu bar. MClean keeps running in the background while this is on." = "在菜单栏中实时显示 CPU、内存和磁盘使用情况。开启时 MClean 将在后台持续运行。";
 "CPU" = "CPU";
+"CPU %lld%%" = "CPU %lld%%";
 "Memory" = "内存";
 "Disk" = "磁盘";
+"Live" = "实时";
 "Open MClean" = "打开 MClean";
+"Settings…" = "设置…";
 "Quit MClean" = "退出 MClean";
 
 /* Space Lens */
@@ -388,9 +377,7 @@
 "Other" = "其他";
 "Couldn't move some items to the Trash" = "部分项目无法移到废纸篓";
 
-/* FDA relaunch detection */
 "Access granted — relaunch to apply" = "已授予权限 — 重新启动后生效";
-"macOS applies Full Disk Access when MClean starts again. Relaunch to finish — takes a second." = "macOS 会在 MClean 重新启动后应用完全磁盘访问权限。重新启动即可完成 — 只需一秒。";
 "Relaunch MClean" = "重新启动 MClean";
 
 /* Donate (About) */

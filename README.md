@@ -91,7 +91,7 @@ Build từ mã nguồn — cần **Xcode 16+** và **macOS 13 trở lên**:
 
 ```bash
 brew install xcodegen
-git clone https://github.com/maclifevn/MClean.git
+git clone https://github.com/PhamHungTien/MClean.git
 cd MClean
 xcodegen generate
 xcodebuild -project MClean.xcodeproj -scheme MClean -configuration Release \

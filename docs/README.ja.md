@@ -19,13 +19,13 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/maclifevn/MClean/releases/latest"><img src="https://img.shields.io/github/v/release/maclifevn/MClean?style=flat-square&label=%E3%83%80%E3%82%A6%E3%83%B3%E3%83%AD%E3%83%BC%E3%83%89" alt="最新リリース"></a>
-  <a href="https://github.com/maclifevn/MClean/actions/workflows/build.yml"><img src="https://img.shields.io/github/actions/workflow/status/maclifevn/MClean/build.yml?style=flat-square&label=Build" alt="ビルド状況"></a>
+  <a href="https://github.com/PhamHungTien/MClean/releases/latest"><img src="https://img.shields.io/github/v/release/PhamHungTien/MClean?style=flat-square&label=%E3%83%80%E3%82%A6%E3%83%B3%E3%83%AD%E3%83%BC%E3%83%89" alt="最新リリース"></a>
+  <a href="https://github.com/PhamHungTien/MClean/actions/workflows/build.yml"><img src="https://img.shields.io/github/actions/workflow/status/PhamHungTien/MClean/build.yml?style=flat-square&label=Build" alt="ビルド状況"></a>
   <img src="https://img.shields.io/badge/macOS-13.0+-blue?style=flat-square" alt="macOS 13.0+">
   <img src="https://img.shields.io/badge/Swift-5.9-orange?style=flat-square" alt="Swift 5.9">
-  <a href="../LICENSE"><img src="https://img.shields.io/github/license/maclifevn/MClean?style=flat-square" alt="MIT License"></a>
-  <a href="https://github.com/maclifevn/MClean/stargazers"><img src="https://img.shields.io/github/stars/maclifevn/MClean?style=flat-square" alt="スター数"></a>
-  <a href="https://github.com/maclifevn/MClean/releases"><img src="https://img.shields.io/github/downloads/maclifevn/MClean/total?style=flat-square&label=%E3%83%80%E3%82%A6%E3%83%B3%E3%83%AD%E3%83%BC%E3%83%89%E6%95%B0" alt="ダウンロード数"></a>
+  <a href="../LICENSE"><img src="https://img.shields.io/github/license/PhamHungTien/MClean?style=flat-square" alt="MIT License"></a>
+  <a href="https://github.com/PhamHungTien/MClean/stargazers"><img src="https://img.shields.io/github/stars/PhamHungTien/MClean?style=flat-square" alt="スター数"></a>
+  <a href="https://github.com/PhamHungTien/MClean/releases"><img src="https://img.shields.io/github/downloads/PhamHungTien/MClean/total?style=flat-square&label=%E3%83%80%E3%82%A6%E3%83%B3%E3%83%AD%E3%83%BC%E3%83%89%E6%95%B0" alt="ダウンロード数"></a>
 </p>
 
 <p align="center">
@@ -48,7 +48,7 @@ brew install --cask mclean
 
 ### 直接ダウンロード
 
-[Releases](https://github.com/maclifevn/MClean/releases/latest) から最新の `.dmg` をダウンロードし、開いて MClean を `/Applications` にドラッグします。
+[Releases](https://github.com/PhamHungTien/MClean/releases/latest) から最新の `.dmg` をダウンロードし、開いて MClean を `/Applications` にドラッグします。
 
 > Apple Developer ID で署名・公証済み — Gatekeeper の警告なしでインストールできます。
 
@@ -56,7 +56,7 @@ brew install --cask mclean
 
 ```bash
 brew install xcodegen
-git clone https://github.com/maclifevn/MClean.git
+git clone https://github.com/PhamHungTien/MClean.git
 cd MClean
 xcodegen generate
 xcodebuild -project MClean.xcodeproj -scheme MClean -configuration Release -derivedDataPath build build

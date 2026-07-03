@@ -19,13 +19,13 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/maclifevn/MClean/releases/latest"><img src="https://img.shields.io/github/v/release/maclifevn/MClean?style=flat-square&label=%E4%B8%8B%E8%BD%BD" alt="最新版本"></a>
-  <a href="https://github.com/maclifevn/MClean/actions/workflows/build.yml"><img src="https://img.shields.io/github/actions/workflow/status/maclifevn/MClean/build.yml?style=flat-square&label=Build" alt="构建状态"></a>
+  <a href="https://github.com/PhamHungTien/MClean/releases/latest"><img src="https://img.shields.io/github/v/release/PhamHungTien/MClean?style=flat-square&label=%E4%B8%8B%E8%BD%BD" alt="最新版本"></a>
+  <a href="https://github.com/PhamHungTien/MClean/actions/workflows/build.yml"><img src="https://img.shields.io/github/actions/workflow/status/PhamHungTien/MClean/build.yml?style=flat-square&label=Build" alt="构建状态"></a>
   <img src="https://img.shields.io/badge/macOS-13.0+-blue?style=flat-square" alt="macOS 13.0+">
   <img src="https://img.shields.io/badge/Swift-5.9-orange?style=flat-square" alt="Swift 5.9">
-  <a href="../LICENSE"><img src="https://img.shields.io/github/license/maclifevn/MClean?style=flat-square" alt="MIT 许可证"></a>
-  <a href="https://github.com/maclifevn/MClean/stargazers"><img src="https://img.shields.io/github/stars/maclifevn/MClean?style=flat-square" alt="Stars"></a>
-  <a href="https://github.com/maclifevn/MClean/releases"><img src="https://img.shields.io/github/downloads/maclifevn/MClean/total?style=flat-square&label=%E4%B8%8B%E8%BD%BD%E9%87%8F" alt="下载量"></a>
+  <a href="../LICENSE"><img src="https://img.shields.io/github/license/PhamHungTien/MClean?style=flat-square" alt="MIT 许可证"></a>
+  <a href="https://github.com/PhamHungTien/MClean/stargazers"><img src="https://img.shields.io/github/stars/PhamHungTien/MClean?style=flat-square" alt="Stars"></a>
+  <a href="https://github.com/PhamHungTien/MClean/releases"><img src="https://img.shields.io/github/downloads/PhamHungTien/MClean/total?style=flat-square&label=%E4%B8%8B%E8%BD%BD%E9%87%8F" alt="下载量"></a>
 </p>
 
 <p align="center">
@@ -48,7 +48,7 @@ brew install --cask mclean
 
 ### 直接下载
 
-从 [Releases](https://github.com/maclifevn/MClean/releases/latest) 下载最新的 `.dmg`，打开后将 MClean 拖到 `/Applications` 目录。
+从 [Releases](https://github.com/PhamHungTien/MClean/releases/latest) 下载最新的 `.dmg`，打开后将 MClean 拖到 `/Applications` 目录。
 
 > 已使用 Apple Developer ID 签名并公证 — 安装时不会出现 Gatekeeper 警告。
 
@@ -56,7 +56,7 @@ brew install --cask mclean
 
 ```bash
 brew install xcodegen
-git clone https://github.com/maclifevn/MClean.git
+git clone https://github.com/PhamHungTien/MClean.git
 cd MClean
 xcodegen generate
 xcodebuild -project MClean.xcodeproj -scheme MClean -configuration Release -derivedDataPath build build

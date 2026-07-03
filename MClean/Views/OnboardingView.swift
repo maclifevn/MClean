@@ -1,22 +1,16 @@
 import SwiftUI
 
 /// First-launch flow. Four scenes, large typography, plenty of breathing
-/// room. Sequence is welcome → mission → permission (with live demo) →
-/// ready. Skip is always available — we don't want to gate adoption on a
-/// reluctant user, but we do want to make the FDA step concrete enough that
-/// the people who *want* to grant it understand exactly what they're doing.
+/// room. Sequence is welcome → mission → folder access → ready. Filesystem
+/// access is always explicit and selected through the native macOS picker.
 struct OnboardingView: View {
     @Binding var isComplete: Bool
     @State private var page: Page = .welcome
-    @State private var hasFda = false
-    @State private var hasOpenedSettings = false
-    @State private var autoAdvanceScheduled = false
     /// +1 when navigating forward, -1 going back — drives the slide direction
     /// so Back doesn't slide the wrong way.
     @State private var direction: Int = 1
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-
-    private let pollTimer = Timer.publish(every: 1.0, on: .main, in: .common).autoconnect()
+    @ObservedObject private var sandboxAccess = SandboxAccessManager.shared
 
     enum Page: Int, CaseIterable {
         case welcome, mission, permission, ready
@@ -55,11 +49,11 @@ struct OnboardingView: View {
         }
         .frame(width: 680, height: 560)
         .onAppear {
-            FullDiskAccessManager.shared.triggerRegistration()
-            refreshFda()
-        }
-        .onReceive(pollTimer) { _ in
-            if page == .permission { refreshFda() }
+            guard NSClassFromString("XCTestCase") == nil,
+                  !sandboxAccess.hasFullScanAccess else { return }
+            DispatchQueue.main.async {
+                sandboxAccess.requestFullScanAccessOnLaunch()
+            }
         }
     }
 
@@ -68,13 +62,12 @@ struct OnboardingView: View {
         switch page {
         case .welcome: WelcomeScene()
         case .mission: MissionScene()
-        case .permission: PermissionScene(
-            hasFda: hasFda,
-            hasOpenedSettings: hasOpenedSettings,
-            openSettings: openSettings,
-            revealAppInFinder: { FullDiskAccessManager.shared.revealAppInFinder() }
-        )
-        case .ready: ReadyScene(hasFda: hasFda)
+        case .permission:
+            FolderAccessScene(
+                hasAccess: sandboxAccess.hasFullScanAccess,
+                chooseFolders: { _ = sandboxAccess.requestFullScanAccess() }
+            )
+        case .ready: ReadyScene(hasFolderAccess: sandboxAccess.hasFullScanAccess)
         }
     }
 
@@ -166,41 +159,6 @@ struct OnboardingView: View {
         }
     }
 
-    private func openSettings() {
-        FullDiskAccessManager.shared.openFullDiskAccessSettings()
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-            FullDiskAccessManager.shared.revealAppInFinder()
-        }
-        withAnimation(.easeInOut(duration: 0.25)) {
-            hasOpenedSettings = true
-        }
-    }
-
-    private func refreshFda() {
-        let granted = FullDiskAccessManager.shared.hasFullDiskAccess
-        if granted != hasFda {
-            withAnimation(.easeInOut(duration: 0.3)) {
-                hasFda = granted
-            }
-            if granted { Haptics.success() }
-        }
-        // Auto-advance once they grant access while on the permission page.
-        // The autoAdvanceScheduled latch prevents the 1-second poll from
-        // queueing multiple .8s delays if grants are detected on back-to-back
-        // ticks before the page actually flips.
-        guard granted, page == .permission, !autoAdvanceScheduled else { return }
-        autoAdvanceScheduled = true
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
-            // Re-check page in case the user manually advanced or backed up
-            // during the delay window.
-            guard page == .permission else {
-                autoAdvanceScheduled = false
-                return
-            }
-            advance(by: 1)
-            autoAdvanceScheduled = false
-        }
-    }
 }
 
 // MARK: - Scenes
@@ -213,26 +171,14 @@ private struct WelcomeScene: View {
         VStack(spacing: 26) {
             Spacer(minLength: 0)
 
-            ZStack {
-                if let icon = NSImage(named: "AppIcon") {
-                    Image(nsImage: icon)
-                        .resizable()
-                        .interpolation(.high)
-                        .frame(width: 120, height: 120)
-                        .shadow(color: .black.opacity(0.15), radius: 18, y: 8)
-                        .offset(y: reduceMotion ? 0 : (bob ? -4 : 4))
-                        .onAppear {
-                            guard !reduceMotion else { return }
-                            withAnimation(.easeInOut(duration: 2.4).repeatForever(autoreverses: true)) {
-                                bob = true
-                            }
-                        }
-                } else {
-                    Image(systemName: "sparkles")
-                        .font(.system(size: 88, weight: .semibold))
-                        .foregroundStyle(Tint.blue)
+            MCleanAppIcon(size: 120, shadow: true)
+                .offset(y: reduceMotion ? 0 : (bob ? -4 : 4))
+                .onAppear {
+                    guard !reduceMotion else { return }
+                    withAnimation(.easeInOut(duration: 2.4).repeatForever(autoreverses: true)) {
+                        bob = true
+                    }
                 }
-            }
             .staggered(0, baseDelay: 0.07)
 
             VStack(spacing: 12) {
@@ -338,90 +284,46 @@ private struct FeatureRow: View {
     }
 }
 
-private struct PermissionScene: View {
-    let hasFda: Bool
-    let hasOpenedSettings: Bool
-    let openSettings: () -> Void
-    let revealAppInFinder: () -> Void
+private struct FolderAccessScene: View {
+    let hasAccess: Bool
+    let chooseFolders: () -> Void
 
     var body: some View {
-        VStack(spacing: 18) {
+        VStack(spacing: 22) {
+            Spacer(minLength: 0)
+            Image(systemName: hasAccess ? "checkmark.shield.fill" : "folder.badge.plus")
+                .font(.system(size: 54, weight: .semibold))
+                .foregroundStyle(hasAccess ? Tint.green : Tint.blue)
+
             VStack(spacing: 8) {
-                Text(hasFda ? "Permission granted" : "One permission, then we're done")
-                    .font(.system(size: 26, weight: .semibold))
-                    .multilineTextAlignment(.center)
-                Text(hasFda
-                     ? "MClean can now reach the locations macOS protects by default."
-                     : "macOS hides certain folders from every app until you say otherwise. We need them to find caches and uninstall cleanly.")
-                    .font(.system(size: 13))
+                Text(hasAccess ? "Full scan access granted" : "Allow the original scan coverage")
+                    .font(.title2.weight(.semibold))
+                Text("Select your startup disk once in the native macOS picker. MClean can then scan the same Home, Library, shared and developer locations as the original version.")
+                    .font(.callout)
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
                     .frame(maxWidth: 460)
             }
-            .staggered(0, baseDelay: 0.07)
 
-            FDADemoView()
-                .frame(maxWidth: 420)
-                .staggered(1, baseDelay: 0.07)
-
-            if hasFda {
-                Label("All set — moving you to the next step.", systemImage: "checkmark.circle.fill")
-                    .font(.system(size: 12.5, weight: .medium))
-                    .foregroundStyle(Tint.green)
-                    .transition(.opacity.combined(with: .scale))
-            } else {
-                // Two equally legitimate paths: open Settings and have it
-                // reveal MClean in Finder, OR grab the draggable icon on the
-                // left and drop it directly into the FDA list. Showing both
-                // side by side lets users pick the path their mental model
-                // prefers without a 3-step decision tree.
-                HStack(alignment: .top, spacing: 18) {
-                    AppBundleDragHandle()
-                    Divider().frame(maxHeight: 90)
-                    VStack(spacing: 8) {
-                        Button {
-                            openSettings()
-                        } label: {
-                            Label(hasOpenedSettings ? "Reopen Settings" : "Open Settings & reveal MClean",
-                                  systemImage: "gear")
-                                .font(.system(size: 13, weight: .semibold))
-                                .frame(minWidth: 240)
-                                .padding(.vertical, 2)
-                        }
-                        .buttonStyle(.borderedProminent)
-                        .controlSize(.large)
-                        .keyboardShortcut(.defaultAction)
-
-                        if hasOpenedSettings {
-                            HStack(spacing: 12) {
-                                Button("Reveal app again") { revealAppInFinder() }
-                                    .buttonStyle(.link)
-                                    .font(.system(size: 11.5))
-                                Button("Reset permissions") {
-                                    _ = FullDiskAccessManager.shared.resetFullDiskAccess()
-                                    FullDiskAccessManager.shared.triggerRegistration()
-                                }
-                                .buttonStyle(.link)
-                                .font(.system(size: 11.5))
-                            }
-                            .transition(.opacity)
-                        } else {
-                            Text("Tip: drag the icon on the left straight into the list.")
-                                .font(.system(size: 11))
-                                .foregroundStyle(.tertiary)
-                                .multilineTextAlignment(.center)
-                        }
-                    }
-                    .frame(maxWidth: 260)
-                }
-                .padding(.top, 4)
+            Button(action: chooseFolders) {
+                Label(hasAccess ? "Full Scan Access Granted" : "Allow Full Scan…",
+                      systemImage: hasAccess ? "checkmark.circle.fill" : "folder.badge.plus")
             }
+            .buttonStyle(.borderedProminent)
+            .controlSize(.large)
+            .disabled(hasAccess)
+
+            Label("Native macOS consent · Access can be revoked anytime",
+                  systemImage: "lock.shield")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            Spacer(minLength: 0)
         }
     }
 }
 
 private struct ReadyScene: View {
-    let hasFda: Bool
+    let hasFolderAccess: Bool
     @State private var bounce = false
     @State private var fireConfetti = false
     @State private var confettiWork: DispatchWorkItem?
@@ -442,11 +344,11 @@ private struct ReadyScene: View {
 
                 ZStack {
                     Circle()
-                        .fill((hasFda ? Tint.green : Tint.orange).opacity(0.12))
+                        .fill((hasFolderAccess ? Tint.green : Tint.blue).opacity(0.12))
                         .frame(width: 110, height: 110)
-                    Image(systemName: hasFda ? "checkmark" : "hand.wave.fill")
+                    Image(systemName: hasFolderAccess ? "checkmark" : "hand.wave.fill")
                         .font(.system(size: 50, weight: .semibold))
-                        .foregroundStyle(hasFda ? Tint.green : Tint.orange)
+                        .foregroundStyle(hasFolderAccess ? Tint.green : Tint.blue)
                         .scaleEffect(bounce ? 1.05 : 1.0)
                 }
                 .onAppear {
@@ -473,11 +375,11 @@ private struct ReadyScene: View {
                 }
 
                 VStack(spacing: 10) {
-                    Text(hasFda ? "You're ready" : "Ready when you are")
+                    Text(hasFolderAccess ? "You're ready" : "Ready when you are")
                         .font(.system(size: 30, weight: .semibold))
-                    Text(hasFda
+                    Text(hasFolderAccess
                          ? "Hit Start to run your first Smart Scan."
-                         : "Some features will be limited without Full Disk Access. You can grant it later in Settings.")
+                         : "Choose folders later from the dashboard or Settings whenever you're ready.")
                         .font(.system(size: 13.5))
                         .foregroundStyle(.secondary)
                         .multilineTextAlignment(.center)

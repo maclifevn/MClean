@@ -87,17 +87,7 @@ final class AppState: ObservableObject {
     @Published var lastCleanedDate: Date?
     @Published var selectedCleanupItems: Set<UUID> = []
     @Published var deselectedItems: Set<UUID> = []
-    @Published var hasFullDiskAccess: Bool = true
-    @Published var fdaBannerDismissed: Bool = false
     @Published var cleanError: String?
-    /// True when the most recent clean error is rooted in a TCC/FDA refusal
-    /// (i.e. items survived even the admin pass). MainWindow uses this to
-    /// route the user into the PermissionSheet instead of the generic alert.
-    @Published var cleanErrorIsFDAFixable: Bool = false
-    /// Items that survived the most recent clean attempt — used to re-run the
-    /// operation after the user grants Full Disk Access without forcing them
-    /// to re-select anything.
-    @Published var pendingPermissionRetryItems: [CleanableItem] = []
 
     // MARK: - App Uninstaller State
 
@@ -110,12 +100,6 @@ final class AppState: ObservableObject {
     @Published var isLoadingApps: Bool = false
     @Published var isScanningAppFiles: Bool = false
     @Published var removalError: String?
-    @Published var removalNeedsFullDiskAccess = false
-    /// Snapshot of the URLs that failed the most recent uninstall due to a
-    /// permission denial. Frozen at finishRemoval time so AppFilesView's
-    /// retry path operates on the failed batch even if the user clicks a
-    /// different app or mutates selection while the FDA sheet is open.
-    @Published var lastFailedRemovalURLs: [URL] = []
     @Published var appFileScanLocationCount: Int = 0
     /// Set when a right-clicked app arrives via the Finder Services handler.
     /// MainWindow consumes it on both onChange AND onAppear so a request that
@@ -188,7 +172,6 @@ final class AppState: ObservableObject {
 
         if performStartupTasks {
             loadDiskInfo()
-            checkFullDiskAccess()
             loadInstalledApps()
             scheduler.setTrigger { [weak self] in
                 await self?.runScheduledScan()
@@ -265,20 +248,6 @@ final class AppState: ObservableObject {
     }
 
     func removeSelectedFiles() {
-        // Re-entrance guard: if a previous removal is still resolving and
-        // the FDA sheet/retry hasn't finished, a second call would race-
-        // overwrite `lastFailedRemovalURLs` before the first batch's retry
-        // closure read it. We can't gate on `removalNeedsFullDiskAccess`
-        // alone — AppFilesView clears that flag the moment it hands off to
-        // the coordinator, leaving a window where a second remove call
-        // would pass the guard while the coordinator is still polling.
-        // PermissionCoordinator.isRequesting covers the full sheet-open +
-        // retry-pending span.
-        guard !removalNeedsFullDiskAccess,
-              !PermissionCoordinator.shared.isRequesting else {
-            Logger.shared.log("Refused duplicate removeSelectedFiles while FDA flow is active", level: .info)
-            return
-        }
         // Safety guard: never allow a high-risk home dotpath (listed in
         // Conditions.swift) to be trashed no matter how it ended up in the
         // selection. Catches selection-time additions that slipped past the
@@ -296,7 +265,6 @@ final class AppState: ObservableObject {
             }
         }
         removalError = nil
-        removalNeedsFullDiskAccess = false
         if !blocked.isEmpty {
             let blockedList = blocked.map(\.path).joined(separator: ", ")
             Logger.shared.log("Refused to delete \(blocked.count) high-risk home dotpath(s): \(blockedList)", level: .warning)
@@ -308,7 +276,7 @@ final class AppState: ObservableObject {
             }
             return
         }
-        trashDirectly(urls: urls) { [weak self] removed, needsFullDiskAccess, needsAdmin, failed in
+        trashDirectly(urls: urls) { [weak self] removed, needsAdmin, failed in
             Task { @MainActor in
                 guard let self else { return }
 
@@ -317,7 +285,6 @@ final class AppState: ObservableObject {
                 guard !needsAdmin.isEmpty else {
                     self.finishRemoval(
                         removedAny: !removed.isEmpty,
-                        needsFullDiskAccess: needsFullDiskAccess,
                         attemptedAdmin: false,
                         failed: failed,
                         adminError: nil
@@ -337,7 +304,6 @@ final class AppState: ObservableObject {
 
                 self.finishRemoval(
                     removedAny: !removed.isEmpty || !adminRemoved.isEmpty,
-                    needsFullDiskAccess: needsFullDiskAccess,
                     attemptedAdmin: true,
                     failed: failed + adminFailed,
                     adminError: adminResult.errors.joined(separator: "; ")
@@ -346,16 +312,10 @@ final class AppState: ObservableObject {
         }
     }
 
-    /// Move files to the Trash via FileManager.trashItem so the syscall
-    /// originates from MClean itself - TCC then registers MClean in the
-    /// Full Disk Access list. The previous AppleScript-via-Finder bridge
-    /// caused the syscall to originate from Finder, which is why granting
-    /// FDA to MClean made no difference (issue #75).
-    private func trashDirectly(urls: [URL], completion: @escaping ([URL], Bool, [URL], [URL]) -> Void) {
+    /// Move files to the Trash using the security-scoped URLs the user chose.
+    private func trashDirectly(urls: [URL], completion: @escaping ([URL], [URL], [URL]) -> Void) {
         DispatchQueue.global(qos: .userInitiated).async {
-            let hasFullDiskAccess = FullDiskAccessManager.shared.hasFullDiskAccess
             var removed: [URL] = []
-            var needsFullDiskAccess = false
             var needsAdmin: [URL] = []
             var failed: [URL] = []
 
@@ -370,10 +330,9 @@ final class AppState: ObservableObject {
                         Logger.shared.log("Trash skipped for \(url.path): file no longer exists", level: .info)
                         removed.append(url)
                     } else if Self.isPermissionDeniedError(nsError) {
-                        if hasFullDiskAccess || Self.isLikelyAdministratorRemovalPath(url) {
+                        if Self.isLikelyAdministratorRemovalPath(url) {
                             needsAdmin.append(url)
                         } else {
-                            needsFullDiskAccess = true
                             failed.append(url)
                         }
                     } else {
@@ -382,7 +341,7 @@ final class AppState: ObservableObject {
                     }
                 }
             }
-            completion(removed, needsFullDiskAccess, needsAdmin, failed)
+            completion(removed, needsAdmin, failed)
         }
     }
 
@@ -404,17 +363,11 @@ final class AppState: ObservableObject {
 
     private func finishRemoval(
         removedAny: Bool,
-        needsFullDiskAccess: Bool,
         attemptedAdmin: Bool,
         failed: [URL],
         adminError: String?
     ) {
-        // Freeze the failed batch before the FDA sheet opens so the retry
-        // path can't be poisoned by later selection edits or app switches.
-        lastFailedRemovalURLs = needsFullDiskAccess ? failed : []
-        removalNeedsFullDiskAccess = needsFullDiskAccess
         if let message = removalFailureMessage(
-            needsFullDiskAccess: needsFullDiskAccess,
             attemptedAdmin: attemptedAdmin,
             failed: failed,
             adminError: adminError
@@ -425,12 +378,6 @@ final class AppState: ObservableObject {
         if removedAny {
             pruneMissingInstalledApps()
         }
-    }
-
-    /// Public bridge so views (e.g. AppFilesView) can build CleanableItem rows
-    /// from raw URLs when retrying via the PermissionCoordinator.
-    func makeUninstallCleanableItem(for url: URL) -> CleanableItem {
-        cleanableUninstallItem(for: url)
     }
 
     private func cleanableUninstallItem(for url: URL) -> CleanableItem {
@@ -451,16 +398,10 @@ final class AppState: ObservableObject {
     }
 
     private func removalFailureMessage(
-        needsFullDiskAccess: Bool,
         attemptedAdmin: Bool,
         failed: [URL],
         adminError: String?
     ) -> String? {
-        if needsFullDiskAccess {
-            let prefix = failed.isEmpty ? "Some selected files" : "\(failed.count) file\(failed.count == 1 ? "" : "s")"
-            return "\(prefix) could not be removed because MClean does not have Full Disk Access. Grant Full Disk Access in System Settings, then try again."
-        }
-
         if !failed.isEmpty {
             if attemptedAdmin {
                 return "\(failed.count) file\(failed.count == 1 ? "" : "s") could not be removed with administrator privileges. The items may have changed or macOS denied access."
@@ -575,7 +516,7 @@ final class AppState: ObservableObject {
 
     // MARK: - Orphan ignore list (#114)
 
-    static let ignoredOrphansKey = "settings.orphans.ignored"
+    nonisolated static let ignoredOrphansKey = "settings.orphans.ignored"
 
     /// Number of paths currently on the "always ignore" list. Read from
     /// UserDefaults each access so the Settings row tracks live changes.
@@ -713,99 +654,6 @@ final class AppState: ObservableObject {
         }
     }
 
-    // MARK: - Full Disk Access
-
-    func checkFullDiskAccess() {
-        Task.detached {
-            let granted = FullDiskAccessManager.shared.hasFullDiskAccess
-            await MainActor.run { [weak self] in
-                self?.hasFullDiskAccess = granted
-            }
-        }
-    }
-
-    func openFullDiskAccessSettings() {
-        FullDiskAccessManager.shared.openFullDiskAccessSettings()
-    }
-
-    /// Request Full Disk Access via the rich PermissionCoordinator sheet and
-    /// retry the supplied items once the user grants permission. Used by both
-    /// the cleanup and app-uninstall flows so they share a single UI surface.
-    ///
-    /// The retry callback captures `items` directly rather than reading
-    /// `pendingPermissionRetryItems` at fire time — that field is mutable
-    /// app-wide and a second permission request would clobber it before the
-    /// first callback resolves, sending the wrong items to retryCleanItems.
-    func requestFullDiskAccessAndRetry(items: [CleanableItem], context: PermissionCoordinator.PromptContext) {
-        pendingPermissionRetryItems = items
-        let capturedItems = items
-        PermissionCoordinator.shared.requestAccess(
-            context: context,
-            failedPaths: items.map { $0.path }
-        ) { [weak self] in
-            Task { @MainActor [weak self] in
-                guard let self else { return }
-                self.pendingPermissionRetryItems = []
-                self.cleanError = nil
-                self.cleanErrorIsFDAFixable = false
-                guard !capturedItems.isEmpty else { return }
-                await self.retryCleanItems(capturedItems)
-            }
-        }
-    }
-
-    private func retryCleanItems(_ items: [CleanableItem]) async {
-        scanState = .cleaning(progress: 0)
-        activity.cleanProgress = 0
-
-        var result = await cleaningEngine.cleanItems(items) { [weak self] progress in
-            Task { @MainActor [weak self] in
-                self?.activity.cleanProgress = progress
-            }
-        }
-        if !result.requiresAdmin.isEmpty {
-            let admin = await cleaningEngine.cleanWithAdminPrivileges(items: result.requiresAdmin)
-            result.cleanedPaths.formUnion(admin.cleanedPaths)
-            result.itemsCleaned += admin.itemsCleaned
-            result.freedSpace += admin.freedSpace
-            result.errors.append(contentsOf: admin.errors)
-        }
-
-        totalFreedSpace = result.freedSpace
-        lastCleanedDate = Date()
-
-        for (cat, catResult) in categoryResults {
-            let remaining = catResult.items.filter { !result.cleanedPaths.contains($0.path) }
-            let cleared = catResult.items.filter { result.cleanedPaths.contains($0.path) }
-            for item in cleared {
-                selectedCleanupItems.remove(item.id)
-                deselectedItems.remove(item.id)
-            }
-            if remaining.isEmpty {
-                categoryResults.removeValue(forKey: cat)
-            } else {
-                categoryResults[cat] = CategoryResult(
-                    category: cat,
-                    items: remaining,
-                    totalSize: remaining.reduce(0) { $0 + $1.size }
-                )
-            }
-        }
-        totalJunkSize = categoryResults.values.reduce(0) { $0 + $1.totalSize }
-
-        // Route survivors back through the same outcome path the original
-        // cleanup uses. Without this, an FDA revocation between grant and
-        // retry would silently drop errors instead of re-popping the sheet.
-        let survivors = items.filter { !result.cleanedPaths.contains($0.path) }
-        handleCleanOutcome(errors: result.errors, survivors: survivors)
-
-        scanState = .cleaned
-        loadDiskInfo()
-        try? await Task.sleep(nanoseconds: 3_000_000_000)
-        scanState = .idle
-        totalFreedSpace = 0
-    }
-
     // MARK: - Disk Info
 
     func loadDiskInfo() {
@@ -819,6 +667,10 @@ final class AppState: ObservableObject {
 
     func startSmartScan() {
         guard !scanState.isActive else { return }
+        guard SandboxAccessManager.hasPersistedFullScanAccess else {
+            Logger.shared.log("Smart Scan requires the user-selected startup disk grant", level: .info)
+            return
+        }
 
         // scanState now changes only on real transitions (idle → scanning →
         // completed); per-tick progress lives on `activity` so the whole
@@ -1029,28 +881,14 @@ final class AppState: ObservableObject {
         }
     }
 
-    /// Inspect a clean batch's leftovers and either route the user into the
-    /// PermissionSheet (FDA is the most likely cause) or surface a richer
-    /// error alert that lists actual paths instead of "Check the log".
+    /// Surface a useful error for items macOS kept protected or in use.
     private func handleCleanOutcome(errors: [String], survivors: [CleanableItem]) {
         guard !errors.isEmpty || !survivors.isEmpty else {
             cleanError = nil
-            cleanErrorIsFDAFixable = false
-            pendingPermissionRetryItems = []
             return
         }
 
-        let fdaGranted = FullDiskAccessManager.shared.hasFullDiskAccess
-        let likelyFDA = !fdaGranted && !survivors.isEmpty
-        cleanErrorIsFDAFixable = likelyFDA
-        pendingPermissionRetryItems = survivors
-
-        if likelyFDA {
-            cleanError = String(
-                format: String(localized: "%lld item(s) need Full Disk Access to remove. Tap Grant Access to fix in one step."),
-                Int64(survivors.count)
-            )
-        } else if !survivors.isEmpty {
+        if !survivors.isEmpty {
             let preview = survivors.prefix(2).map { ($0.path as NSString).lastPathComponent }.joined(separator: ", ")
             let extra = survivors.count > 2 ? String(format: String(localized: " and %lld more"), Int64(survivors.count - 2)) : ""
             cleanError = String(
@@ -1085,6 +923,10 @@ final class AppState: ObservableObject {
     // MARK: - Scheduled Scan
 
     private func runScheduledScan() async {
+        guard SandboxAccessManager.hasPersistedFullScanAccess else {
+            Logger.shared.log("Scheduled scan skipped until full scan access is granted", level: .info)
+            return
+        }
         let categories = scheduler.config.categoriesToScan
         var totalFound: Int64 = 0
         clearSelectionState()

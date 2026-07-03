@@ -39,6 +39,12 @@ class Locations: ObservableObject {
         self.cacheDir = cacheDir
         self.tempDir = tempDir
 
+        guard SandboxAccessManager.hasPersistedFullScanAccess else {
+            self.appSearch = SearchCategory(name: "Apps", paths: [])
+            self.reverseSearch = SearchCategory(name: "Reverse", paths: [])
+            return
+        }
+
         self.appSearch = SearchCategory(name: "Apps", paths: [
             // User home - bare "\(home)" is intentionally NOT scanned.
             // Scanning bare $HOME matches top-level dotfiles like .claude,

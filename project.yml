@@ -7,6 +7,14 @@ options:
   createIntermediateGroups: true
   defaultConfig: Release
 
+# AppStore duplicates Release but swaps in the sandboxed entitlements and the
+# APPSTORE compilation condition, keeping privileged helpers and launchctl-only
+# flows out of the Mac App Store build.
+configs:
+  Debug: debug
+  Release: release
+  AppStore: release
+
 settings:
   base:
     SWIFT_VERSION: "5.9"
@@ -18,15 +26,19 @@ settings:
     DEAD_CODE_STRIPPING: "YES"
     CODE_SIGN_IDENTITY: "Apple Development"
     CODE_SIGN_STYLE: "Automatic"
-    DEVELOPMENT_TEAM: "CF5PGH3KGK"
+    DEVELOPMENT_TEAM: "95AKA2N383"
     CODE_SIGN_ENTITLEMENTS: "MClean/MClean.entitlements"
     INFOPLIST_FILE: "MClean/Info.plist"
     PRODUCT_BUNDLE_IDENTIFIER: "com.maclife.mclean"
     MARKETING_VERSION: "1.0.0"
     CURRENT_PROJECT_VERSION: "1"
     GENERATE_INFOPLIST_FILE: "NO"
-    ASSETCATALOG_COMPILER_APPICON_NAME: "AppIcon"
+    # Icon Composer bundle at repo root (MClean.icon), compiled by actool.
+    ASSETCATALOG_COMPILER_APPICON_NAME: "MClean"
     COMBINE_HIDPI_IMAGES: "YES"
+    # Silence the benign "Metadata extraction skipped" build log line; the
+    # app has no AppIntents.
+    LM_SKIP_METADATA_EXTRACTION: "YES"
   configs:
     Release:
       # Shipped builds stay universal; strip symbols from the executable
@@ -34,6 +46,12 @@ settings:
       ONLY_ACTIVE_ARCH: "NO"
       STRIP_INSTALLED_PRODUCT: "YES"
       STRIP_STYLE: "non-global"
+    AppStore:
+      ONLY_ACTIVE_ARCH: "NO"
+      STRIP_INSTALLED_PRODUCT: "YES"
+      STRIP_STYLE: "non-global"
+      CODE_SIGN_ENTITLEMENTS: "MClean/MClean-AppStore.entitlements"
+      SWIFT_ACTIVE_COMPILATION_CONDITIONS: "APPSTORE"
 
 targets:
   MClean:
@@ -41,14 +59,20 @@ targets:
     platform: macOS
     sources:
       - MClean
+      - path: MClean.icon
+        buildPhase: resources
     settings:
       base:
         PRODUCT_NAME: MClean
+        # Must live at target level: XcodeGen's target preset otherwise
+        # overrides it back to "AppIcon".
+        ASSETCATALOG_COMPILER_APPICON_NAME: "MClean"
         SWIFT_EMIT_LOC_STRINGS: "YES"
         LD_RUNPATH_SEARCH_PATHS: "$(inherited) @executable_path/../Frameworks"
       # Debug signing intentionally NOT disabled: a real Apple Development
-      # signature keeps the TCC/FDA grant stable across rebuilds (ad-hoc
-      # signatures change cdhash every build and macOS drops the grant).
+      # signature keeps security-scoped bookmarks stable across rebuilds
+      # (ad-hoc signatures change cdhash every build and macOS may invalidate
+      # saved access).
 
   MCleanTests:
     type: bundle.unit-test
@@ -67,3 +91,13 @@ schemes:
     test:
       targets:
         - name: MCleanTests
+
+  # Archive with this scheme for Mac App Store submission.
+  MClean-AppStore:
+    build:
+      targets:
+        MClean: all
+    run:
+      config: AppStore
+    archive:
+      config: AppStore

@@ -15,7 +15,7 @@ enum Haptics {
     }
 
     /// Stronger affirmation — use when a user-visible state change crosses a
-    /// boundary (Full Disk Access granted, scan completed, clean finished).
+    /// boundary (folder access granted, scan completed, clean finished).
     static func success() {
         perform(.levelChange)
     }

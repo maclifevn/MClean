@@ -15,7 +15,7 @@
             buildForAnalyzing = "YES">
             <BuildableReference
                BuildableIdentifier = "primary"
-               BlueprintIdentifier = "B19E38DEAA0144A77120F39C"
+               BlueprintIdentifier = "5AE44384BA80EA7E4C2A7B84"
                BuildableName = "MClean.app"
                BlueprintName = "MClean"
                ReferencedContainer = "container:MClean.xcodeproj">
@@ -29,7 +29,7 @@
             buildForAnalyzing = "NO">
             <BuildableReference
                BuildableIdentifier = "primary"
-               BlueprintIdentifier = "FBA8B0DE95746207A043B802"
+               BlueprintIdentifier = "85E948CCD67F5E930B4087AF"
                BuildableName = "MCleanTests.xctest"
                BlueprintName = "MCleanTests"
                ReferencedContainer = "container:MClean.xcodeproj">
@@ -46,7 +46,7 @@
       <MacroExpansion>
          <BuildableReference
             BuildableIdentifier = "primary"
-            BlueprintIdentifier = "B19E38DEAA0144A77120F39C"
+            BlueprintIdentifier = "5AE44384BA80EA7E4C2A7B84"
             BuildableName = "MClean.app"
             BlueprintName = "MClean"
             ReferencedContainer = "container:MClean.xcodeproj">
@@ -58,7 +58,7 @@
             parallelizable = "NO">
             <BuildableReference
                BuildableIdentifier = "primary"
-               BlueprintIdentifier = "FBA8B0DE95746207A043B802"
+               BlueprintIdentifier = "85E948CCD67F5E930B4087AF"
                BuildableName = "MCleanTests.xctest"
                BlueprintName = "MCleanTests"
                ReferencedContainer = "container:MClean.xcodeproj">
@@ -82,7 +82,7 @@
          runnableDebuggingMode = "0">
          <BuildableReference
             BuildableIdentifier = "primary"
-            BlueprintIdentifier = "B19E38DEAA0144A77120F39C"
+            BlueprintIdentifier = "5AE44384BA80EA7E4C2A7B84"
             BuildableName = "MClean.app"
             BlueprintName = "MClean"
             ReferencedContainer = "container:MClean.xcodeproj">
@@ -99,7 +99,7 @@
          runnableDebuggingMode = "0">
          <BuildableReference
             BuildableIdentifier = "primary"
-            BlueprintIdentifier = "B19E38DEAA0144A77120F39C"
+            BlueprintIdentifier = "5AE44384BA80EA7E4C2A7B84"
             BuildableName = "MClean.app"
             BlueprintName = "MClean"
             ReferencedContainer = "container:MClean.xcodeproj">
