@@ -31,8 +31,7 @@ struct AppBundleDragHandle: View {
                             )
                     )
 
-                appIcon
-                    .frame(width: 56, height: 56)
+                MCleanAppIcon(size: 56)
                     .scaleEffect(hovering ? 1.04 : 1.0)
                     .shadow(color: .black.opacity(hovering ? 0.18 : 0.08),
                             radius: hovering ? 8 : 4, y: hovering ? 3 : 1)
@@ -63,16 +62,4 @@ struct AppBundleDragHandle: View {
         }
     }
 
-    @ViewBuilder
-    private var appIcon: some View {
-        if let nsImage = NSWorkspace.shared.icon(forFile: bundleURL.path) as NSImage? {
-            Image(nsImage: nsImage)
-                .resizable()
-                .interpolation(.high)
-        } else {
-            Image(systemName: "app.fill")
-                .font(.system(size: 36))
-                .foregroundStyle(Tint.blue)
-        }
-    }
 }

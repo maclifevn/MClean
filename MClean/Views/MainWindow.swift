@@ -12,10 +12,11 @@ struct MainWindow: View {
     var body: some View {
         NavigationSplitView(columnVisibility: $columnVisibility) {
             sidebar
+                .frame(width: 236)
+                .navigationSplitViewColumnWidth(236)
         } detail: {
             detailContainer
         }
-        .navigationSplitViewColumnWidth(min: 232, ideal: 244, max: 320)
         .frame(minWidth: 980, minHeight: 600)
         .toolbar {
             ToolbarItem(placement: .navigation) {
@@ -25,6 +26,9 @@ struct MainWindow: View {
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
             appState.checkFullDiskAccess()
             permission.refreshStatus()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .mCleanSmartScanRequested)) { _ in
+            consumeMenuBarSmartScanRequest()
         }
         .onChange(of: appState.pendingExternalApp) { app in
             // A right-clicked app arrived via Finder Services — surface the
@@ -41,6 +45,7 @@ struct MainWindow: View {
                 selectedSection = .apps
                 appState.pendingExternalApp = nil
             }
+            consumeMenuBarSmartScanRequest()
         }
         .onChange(of: appState.cleanErrorIsFDAFixable) { isFDAFixable in
             // Auto-route FDA-fixable clean errors straight into the rich
@@ -71,53 +76,55 @@ struct MainWindow: View {
         }
     }
 
+    private func consumeMenuBarSmartScanRequest() {
+        guard MenuBarQuickActionBuffer.smartScanRequested else { return }
+        MenuBarQuickActionBuffer.smartScanRequested = false
+        selectedSection = .cleaning(.smartScan)
+        appState.startSmartScan()
+    }
+
     // MARK: - Sidebar
 
     private var sidebar: some View {
-        List(selection: $selectedSection) {
-            Section {
-                navRow(section: .cleaning(.smartScan), label: "Dashboard",
-                       icon: "sparkles", tint: Tint.blue,
-                       badge: dashboardBadge)
-                SpaceLensNavRow(lens: appState.spaceLens,
-                                isSelected: selectedSection == .spaceLens)
-            } header: { sectionLabel("Overview") }
+        VStack(spacing: 0) {
+            List(selection: $selectedSection) {
+                Section {
+                    navRow(section: .cleaning(.smartScan), label: "Dashboard",
+                           icon: "sparkles", tint: Tint.blue,
+                           badge: dashboardBadge)
+                    SpaceLensNavRow(lens: appState.spaceLens,
+                                    isSelected: selectedSection == .spaceLens)
+                } header: { sectionLabel("Overview") }
 
-            Section {
-                // "App Uninstaller", not "Installed Apps": the row IS the
-                // uninstall feature, and users looking to remove an app
-                // scanned right past the old descriptive name (user report).
-                navRow(section: .apps, label: "App Uninstaller",
-                       icon: "square.grid.2x2.fill", tint: Tint.purple,
-                       badge: appState.installedApps.isEmpty ? nil : "\(appState.installedApps.count)")
-                navRow(section: .orphans, label: "Orphaned Files",
-                       icon: "doc.questionmark.fill", tint: Tint.pink,
-                       badge: appState.orphanedFiles.isEmpty ? nil : "\(appState.orphanedFiles.count)")
-            } header: { sectionLabel("Applications") }
+                Section {
+                    navRow(section: .apps, label: "App Uninstaller",
+                           icon: "square.grid.2x2.fill", tint: Tint.purple,
+                           badge: appState.installedApps.isEmpty ? nil : "\(appState.installedApps.count)")
+                    navRow(section: .orphans, label: "Orphaned Files",
+                           icon: "doc.questionmark.fill", tint: Tint.pink,
+                           badge: appState.orphanedFiles.isEmpty ? nil : "\(appState.orphanedFiles.count)")
+                } header: { sectionLabel("Applications") }
 
-            Section {
-                ForEach(CleaningCategory.scannable) { category in
-                    navRow(section: .cleaning(category),
-                           label: LocalizedStringKey(category.rawValue),
-                           icon: category.icon,
-                           tint: category.color,
-                           badge: sizeBadge(for: category))
-                }
-            } header: { sectionLabel("Cleanup") }
-        }
-        .listStyle(.sidebar)
-        .navigationTitle("MClean")
-        .safeAreaInset(edge: .bottom) {
+                Section {
+                    ForEach(CleaningCategory.scannable) { category in
+                        navRow(section: .cleaning(category),
+                               label: LocalizedStringKey(category.rawValue),
+                               icon: category.icon,
+                               tint: category.color,
+                               badge: sizeBadge(for: category))
+                    }
+                } header: { sectionLabel("Cleanup") }
+            }
+            .listStyle(.sidebar)
+
+            Divider()
             healthFooter
         }
+        .navigationTitle("MClean")
     }
 
     private func sectionLabel(_ text: LocalizedStringKey) -> some View {
         Text(text)
-            .font(.system(size: 10.5, weight: .semibold))
-            .tracking(0.5)
-            .foregroundStyle(.tertiary)
-            .textCase(.uppercase)
     }
 
     private func navRow(section: AppSection, label: LocalizedStringKey, icon: String,
@@ -146,19 +153,14 @@ struct MainWindow: View {
         return HStack(spacing: 10) {
             PulsingDot(tint: tint, isPulsing: !ok)
 
-            VStack(alignment: .leading, spacing: 1) {
-                Text(LocalizedStringKey(ok ? "Ready to clean" : "Limited access"))
-                    .font(.system(size: 12, weight: .semibold))
-                    // Explicit solid color — same vibrancy-collapse guard as the
-                    // sidebar rows (#117); this title also inherited the default.
-                    .foregroundStyle(colorScheme == .dark
-                        ? Color.white.opacity(0.92)
-                        : Color.black.opacity(0.85))
-                Text(LocalizedStringKey(ok ? "Full Disk Access granted" : "Grant FDA in Settings"))
-                    .font(.system(size: 10.5))
-                    .foregroundStyle(.secondary)
-            }
-            Spacer()
+            Text(LocalizedStringKey(ok ? "Ready to clean" : "Limited access"))
+                .font(.system(size: 11.5, weight: .semibold))
+                .foregroundStyle(colorScheme == .dark
+                    ? Color.white.opacity(0.92)
+                    : Color.black.opacity(0.85))
+                .lineLimit(1)
+
+            Spacer(minLength: 4)
             if !ok {
                 Button("Fix") {
                     permission.requestAccess(context: .general) {
@@ -170,8 +172,9 @@ struct MainWindow: View {
                 .help("Fix permission")
             }
         }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 10)
+        .help(LocalizedStringKey(ok ? "Full Disk Access granted" : "Grant FDA in Settings"))
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
         .background(.bar)
     }
 
@@ -353,15 +356,17 @@ private struct SidebarNavRow: View {
     let badge: String?
     let isSelected: Bool
 
-    @State private var hovering = false
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
-        HStack(spacing: 10) {
-            IconTile(systemName: icon, tint: tint, size: 24, glow: isSelected)
+        HStack(spacing: 9) {
+            Image(systemName: icon)
+                .symbolRenderingMode(.hierarchical)
+                .font(.system(size: 14, weight: .medium))
+                .foregroundStyle(tint)
+                .frame(width: 18)
             Text(label)
-                .font(.system(size: 13, weight: isSelected ? .semibold : .regular))
+                .font(.system(size: 13, weight: isSelected ? .medium : .regular))
                 // Force an explicit, solid foreground instead of inheriting the
                 // sidebar list's default. On some configs (custom accent /
                 // reduced transparency, seen on M1 Max — issue #117) the
@@ -370,33 +375,20 @@ private struct SidebarNavRow: View {
                 // (headers, badges) stays visible. A colorScheme-driven solid
                 // color sidesteps that vibrancy path entirely.
                 .foregroundStyle(labelColor)
-            Spacer()
+                .lineLimit(1)
+            Spacer(minLength: 6)
             if let badge {
                 Text(badge)
-                    .font(.system(size: 11, weight: .semibold))
+                    .font(.system(size: 10.5, weight: .medium))
                     .monospacedDigit()
-                    .foregroundStyle(isSelected ? tint : .secondary)
-                    .padding(.horizontal, 7)
-                    .padding(.vertical, 2)
-                    .background(
-                        Capsule().fill(
-                            (isSelected ? tint : Color.primary).opacity(isSelected ? 0.15 : 0.06)
-                        )
-                    )
+                    .foregroundStyle(isSelected ? labelColor : .secondary)
+                    .lineLimit(1)
                     .contentTransition(.numericText())
             }
         }
-        .padding(.vertical, 2)
-        // Leading anchor keeps the row from clipping against the sidebar edge.
-        .scaleEffect(hovering && !reduceMotion ? 1.02 : 1, anchor: .leading)
-        .background(
-            RoundedRectangle(cornerRadius: 6, style: .continuous)
-                .fill(Color.primary.opacity(hovering && !isSelected ? 0.05 : 0))
-                .padding(.horizontal, -6)
-        )
-        .animation(reduceMotion ? nil : MotionTokens.snappy, value: hovering)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.vertical, 1)
         .contentShape(Rectangle())
-        .onHover { hovering = $0 }
     }
 
     /// Solid, opaque label color that adapts to light/dark without routing

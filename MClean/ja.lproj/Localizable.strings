@@ -367,9 +367,12 @@
 "Show system monitor in menu bar" = "メニューバーにシステムモニタを表示";
 "Live CPU, memory, and disk meters in the menu bar. MClean keeps running in the background while this is on." = "CPU、メモリ、ディスクの使用状況をメニューバーにリアルタイム表示します。オンの間、MCleanはバックグラウンドで動作し続けます。";
 "CPU" = "CPU";
+"CPU %lld%%" = "CPU %lld%%";
 "Memory" = "メモリ";
 "Disk" = "ディスク";
+"Live" = "ライブ";
 "Open MClean" = "MCleanを開く";
+"Settings…" = "設定…";
 "Quit MClean" = "MCleanを終了";
 
 /* Space Lens */

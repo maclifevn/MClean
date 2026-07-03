@@ -40,7 +40,7 @@ struct GeneralSettingsView: View {
     @AppStorage("settings.general.launchAtLogin") private var launchAtLogin = false
     @AppStorage("settings.general.searchSensitivity") private var sensitivity: SearchSensitivity = .enhanced
     @AppStorage("settings.general.confirmBeforeDelete") private var confirmBeforeDelete = true
-    @AppStorage("settings.general.menuBarMonitor") private var menuBarMonitor = false
+    @AppStorage("settings.general.menuBarMonitor") private var menuBarMonitor = true
     @AppStorage(Haptics.soundEffectsKey) private var soundEffects = true
     @AppStorage(AppLanguage.preferenceKey) private var appLanguageRaw = AppLanguage.current.rawValue
     @State private var languageNeedsRelaunch = false
@@ -330,11 +330,7 @@ struct AboutSettingsView: View {
         Form {
             Section {
                 HStack {
-                    if let appIcon = NSImage(named: "AppIcon") {
-                        Image(nsImage: appIcon)
-                            .resizable()
-                            .frame(width: 64, height: 64)
-                    }
+                    MCleanAppIcon(size: 64, shadow: true)
                     VStack(alignment: .leading, spacing: 4) {
                         Text("MClean")
                             .font(.title2.bold())

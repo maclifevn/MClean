@@ -16,6 +16,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSWindow.allowsAutomaticWindowTabbing = false
 
+        // The status item is a core quick-access surface for new installs.
+        // `register` preserves an existing explicit opt-out.
+        UserDefaults.standard.register(defaults: [
+            "settings.general.menuBarMonitor": true,
+        ])
+
         // Install the menu-bar monitor if the user has it enabled. Never under
         // XCTest — the status-item machinery would stall the test-host run loop.
         if NSClassFromString("XCTestCase") == nil {
@@ -76,6 +82,7 @@ extension Notification.Name {
     /// Posted when the "Show system monitor in menu bar" Settings toggle flips,
     /// so AppDelegate can add/remove the status item live.
     static let mCleanMenuBarMonitorChanged = Notification.Name("MClean.MenuBarMonitorChanged")
+    static let mCleanSmartScanRequested = Notification.Name("MClean.SmartScanRequested")
 }
 
 @main
