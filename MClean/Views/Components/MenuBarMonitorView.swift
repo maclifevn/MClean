@@ -99,14 +99,7 @@ struct MenuBarMonitorView: View {
 
     private var header: some View {
         HStack(spacing: 11) {
-            Image("MenuBarIcon")
-                .renderingMode(.template)
-                .resizable()
-                .scaledToFit()
-                .foregroundStyle(.primary)
-                .frame(width: 24, height: 24)
-                .padding(5)
-                .background(.quaternary, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+            MCleanAppIcon(size: 34, shadow: true)
 
             VStack(alignment: .leading, spacing: 2) {
                 Text("MClean")

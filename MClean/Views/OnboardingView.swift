@@ -213,26 +213,14 @@ private struct WelcomeScene: View {
         VStack(spacing: 26) {
             Spacer(minLength: 0)
 
-            ZStack {
-                if let icon = NSImage(named: "AppIcon") {
-                    Image(nsImage: icon)
-                        .resizable()
-                        .interpolation(.high)
-                        .frame(width: 120, height: 120)
-                        .shadow(color: .black.opacity(0.15), radius: 18, y: 8)
-                        .offset(y: reduceMotion ? 0 : (bob ? -4 : 4))
-                        .onAppear {
-                            guard !reduceMotion else { return }
-                            withAnimation(.easeInOut(duration: 2.4).repeatForever(autoreverses: true)) {
-                                bob = true
-                            }
-                        }
-                } else {
-                    Image(systemName: "sparkles")
-                        .font(.system(size: 88, weight: .semibold))
-                        .foregroundStyle(Tint.blue)
+            MCleanAppIcon(size: 120, shadow: true)
+                .offset(y: reduceMotion ? 0 : (bob ? -4 : 4))
+                .onAppear {
+                    guard !reduceMotion else { return }
+                    withAnimation(.easeInOut(duration: 2.4).repeatForever(autoreverses: true)) {
+                        bob = true
+                    }
                 }
-            }
             .staggered(0, baseDelay: 0.07)
 
             VStack(spacing: 12) {
