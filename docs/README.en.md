@@ -5,8 +5,6 @@
 <p align="center">
   <a href="../README.md">Tiếng Việt</a> |
   <b>English</b> |
-  <a href="README.ar.md">العربية</a> |
-  <a href="README.es.md">Español</a> |
   <a href="README.ja.md">日本語</a> |
   <a href="README.zh-Hans.md">简体中文</a> |
   <a href="README.zh-Hant.md">繁體中文</a>
@@ -50,6 +48,11 @@ Apple sells base-model Macs with 256 GB SSDs that you can't upgrade. Once you've
 ## What it does
 
 ### App Uninstaller
+
+<p align="center">
+  <img src="assets/app-uninstaller.png" alt="MClean App Uninstaller — every leftover file grouped before removal" width="820">
+</p>
+
 Discovers everything in `/Applications` and `~/Applications`, then uses a 10-level matching engine (bundle ID, team identifier, entitlements, Spotlight metadata, container discovery, company-name heuristics, partial path matches) to find every file the app dropped. Three sensitivity tiers — Strict, Enhanced, Deep. Apple system apps are excluded automatically. You can also right-click any app in Finder → **Services → Uninstall with MClean**.
 
 ### Orphan Finder
@@ -59,6 +62,11 @@ Walks `~/Library` and surfaces files left behind by apps that no longer exist on
 Smart Scan runs every category in parallel: System Junk, User Cache, AI Apps, Mail Files, Trash Bins, Large & Old Files, Xcode Junk, Brew Cache, Node Cache, Docker Cache.
 
 ### Space Lens
+
+<p align="center">
+  <img src="assets/space-lens.png" alt="MClean Space Lens — interactive bubble map of disk usage" width="820">
+</p>
+
 Scan any folder and see its contents as an interactive bubble map — every bubble sized proportionally to the bytes it holds. Drill into folders, then check items to move them to the Trash. Sizes are real allocated bytes: hard links deduplicated, symlinks never followed, app bundles treated as single items.
 
 ### Scheduled Cleaning
