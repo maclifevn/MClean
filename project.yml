@@ -16,7 +16,10 @@ settings:
     SWIFT_VERSION: "5.9"
     MACOSX_DEPLOYMENT_TARGET: "13.0"
     ARCHS: "arm64 x86_64"
-    ONLY_ACTIVE_ARCH: "NO"
+    # Universal only where it matters (Release, overridden below). Debug builds
+    # just the active arch for ~2x faster local iteration.
+    ONLY_ACTIVE_ARCH: "YES"
+    DEAD_CODE_STRIPPING: "YES"
     CODE_SIGN_IDENTITY: "Apple Development"
     CODE_SIGN_STYLE: "Automatic"
     DEVELOPMENT_TEAM: "CF5PGH3KGK"
@@ -28,6 +31,13 @@ settings:
     GENERATE_INFOPLIST_FILE: "NO"
     ASSETCATALOG_COMPILER_APPICON_NAME: "AppIcon"
     COMBINE_HIDPI_IMAGES: "YES"
+  configs:
+    Release:
+      # Shipped builds stay universal; strip symbols from the executable
+      # (crash symbolication still works via the separate dSYM).
+      ONLY_ACTIVE_ARCH: "NO"
+      STRIP_INSTALLED_PRODUCT: "YES"
+      STRIP_STYLE: "non-global"
 
 targets:
   MClean:

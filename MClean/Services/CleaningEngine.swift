@@ -403,7 +403,10 @@ actor CleaningEngine {
                 result.freedSpace += item.size
                 result.trashedCount += 1
                 result.trashedPaths.insert(item.url.path)
-                Logger.shared.log("Trashed \(item.url.path)")
+                // .debug so per-item successes go to os.Logger only, not the
+                // in-memory @Published entries array (avoids UI churn when
+                // trashing many items at once).
+                Logger.shared.log("Trashed \(item.url.path)", level: .debug)
             } catch {
                 let detail = "\(item.url.lastPathComponent): \(error.localizedDescription)"
                 result.errors.append(detail)

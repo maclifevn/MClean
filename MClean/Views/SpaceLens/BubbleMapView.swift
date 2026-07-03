@@ -7,6 +7,7 @@ import SwiftUI
 struct BubbleMapView: View {
     @ObservedObject var lens: SpaceLensViewModel
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @StateObject private var layoutCache = BubbleLayoutCache()
 
     /// Bubbles beyond this rank collapse into one aggregate "Other" bubble —
     /// the packer stays trivially fast and labels stay legible.
@@ -17,7 +18,12 @@ struct BubbleMapView: View {
             let displayed = displayedChildren
             let otherSize = aggregateOtherSize(beyond: displayed)
             let sizes = displayed.map(\.size) + (otherSize > 0 ? [otherSize] : [])
-            let placements = BubbleLayout.pack(sizes: sizes, in: geometry.size, padding: 10)
+            // Memoized: pack() is O(n²) and body re-runs on every selection
+            // toggle and every frame of the drill-in spring animation. The
+            // layout is deterministic, so cache it per (node, sizes, canvas)
+            // and only recompute when one of those actually changes.
+            let placements = layoutCache.placements(
+                nodeID: lens.currentNode?.id, sizes: sizes, canvas: geometry.size)
 
             ZStack {
                 ForEach(Array(displayed.enumerated()), id: \.element.id) { index, node in
@@ -159,5 +165,23 @@ private struct SpaceLensBubble: View {
         .accessibilityLabel(Text(verbatim: node.name))
         .accessibilityValue(Text(verbatim: node.formattedSize))
         .accessibilityAddTraits(.isButton)
+    }
+}
+
+/// Memoizes the deterministic bubble packing so it isn't recomputed on every
+/// body pass. `pack()` is O(n²); without this it re-runs on each selection
+/// toggle and once per frame during the drill-in animation.
+private final class BubbleLayoutCache: ObservableObject {
+    private var key: (nodeID: UUID?, sizes: [Int64], canvas: CGSize)?
+    private var cached: [BubbleLayout.Placement] = []
+
+    func placements(nodeID: UUID?, sizes: [Int64], canvas: CGSize) -> [BubbleLayout.Placement] {
+        if let key, key.nodeID == nodeID, key.sizes == sizes, key.canvas == canvas {
+            return cached
+        }
+        let result = BubbleLayout.pack(sizes: sizes, in: canvas, padding: 10)
+        key = (nodeID, sizes, canvas)
+        cached = result
+        return result
     }
 }

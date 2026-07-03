@@ -280,7 +280,7 @@ private struct SpaceLensRow: View {
                 .toggleStyle(AnimatedCheckboxStyle(tint: Tint.cyan))
                 .labelsHidden()
 
-            Image(nsImage: NSWorkspace.shared.icon(forFile: node.url.path))
+            Image(nsImage: FileIconCache.icon(forPath: node.url.path))
                 .resizable()
                 .frame(width: 18, height: 18)
 

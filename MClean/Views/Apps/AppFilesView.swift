@@ -428,7 +428,7 @@ struct FileRow: View {
     var body: some View {
         Toggle(isOn: $isSelected) {
             HStack {
-                Image(nsImage: NSWorkspace.shared.icon(forFile: fileURL.path))
+                Image(nsImage: FileIconCache.icon(forPath: fileURL.path))
                     .resizable()
                     .frame(width: 16, height: 16)
 

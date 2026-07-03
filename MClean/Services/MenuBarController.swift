@@ -70,9 +70,17 @@ final class MenuBarController: NSObject, NSPopoverDelegate {
         monitor.stop()
     }
 
+    private var lastShownPercent: Int = -1
+
     private func updateTitle() {
         guard let button = statusItem.button else { return }
-        button.title = " \(Int((monitor.cpuUsage * 100).rounded()))%"
+        // Skip the status-item relayout when the rounded percentage is
+        // unchanged (the monitor samples every 2s but CPU% often rounds the
+        // same); avoids a needless menu-bar relayout each tick.
+        let percent = Int((monitor.cpuUsage * 100).rounded())
+        guard percent != lastShownPercent else { return }
+        lastShownPercent = percent
+        button.title = " \(percent)%"
     }
 
     @objc private func togglePopover() {

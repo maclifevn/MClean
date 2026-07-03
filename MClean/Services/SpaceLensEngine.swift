@@ -57,6 +57,10 @@ actor SpaceLensEngine {
         .totalFileAllocatedSizeKey, .fileAllocatedSizeKey,
         .linkCountKey, .fileResourceIdentifierKey,
     ]
+    /// Prebuilt Set of the same keys. `resourceValues(forKeys:)` takes a Set,
+    /// so caching it avoids allocating a fresh Set per entry across a
+    /// hundreds-of-thousands-of-inodes tree walk.
+    private static let resourceKeySet = Set(resourceKeys)
 
     /// Scan `root` and return its tree. Hidden files are included — finding
     /// space is the point. Symlinks are counted as the link itself, never
@@ -77,9 +81,10 @@ actor SpaceLensEngine {
             for entry in try fileManager.contentsOfDirectory(
                 at: root, includingPropertiesForKeys: Self.resourceKeys, options: []
             ) {
-                let values = try? entry.resourceValues(forKeys: [
-                    .isDirectoryKey, .isSymbolicLinkKey, .isPackageKey,
-                ])
+                // Read the SAME key set that was prefetched above, so this
+                // resolves from the URL's resource cache instead of forcing a
+                // second getattrlist syscall per entry.
+                let values = try? entry.resourceValues(forKeys: Self.resourceKeySet)
                 let isRealDirectory = (values?.isDirectory ?? false)
                     && !(values?.isSymbolicLink ?? false)
                     && !(values?.isPackage ?? false)
@@ -166,7 +171,7 @@ actor SpaceLensEngine {
         }
 
         for entry in entries {
-            guard let values = try? entry.resourceValues(forKeys: Set(resourceKeys)) else {
+            guard let values = try? entry.resourceValues(forKeys: resourceKeySet) else {
                 continue
             }
             let isSymlink = values.isSymbolicLink ?? false
@@ -218,7 +223,7 @@ actor SpaceLensEngine {
             at: url, includingPropertiesForKeys: resourceKeys, options: []
         ) else { return 0 }
         for entry in entries {
-            guard let values = try? entry.resourceValues(forKeys: Set(resourceKeys)) else {
+            guard let values = try? entry.resourceValues(forKeys: resourceKeySet) else {
                 continue
             }
             if !(values.isSymbolicLink ?? false), values.isDirectory ?? false {
@@ -246,7 +251,7 @@ actor SpaceLensEngine {
     /// below the threshold the caller folds the bytes into the pruned tally.
     private static func sizeLeaf(at url: URL, minNodeSize: Int64,
                                  progress: ProgressBox) -> (bytes: Int64, node: SpaceLensNode?) {
-        guard let values = try? url.resourceValues(forKeys: Set(resourceKeys)) else {
+        guard let values = try? url.resourceValues(forKeys: resourceKeySet) else {
             return (0, nil)
         }
         let isSymlink = values.isSymbolicLink ?? false

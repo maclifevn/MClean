@@ -44,6 +44,12 @@ final class Logger: ObservableObject {
     nonisolated func log(_ message: String, level: LogLevel = .info, source: String = #function) {
         osLogger.log(level: level.osLogType, "\(message, privacy: .public)")
 
+        // .debug entries go to os.Logger (Console.app) only. High-frequency
+        // per-item logs on hot paths (e.g. one line per trashed file) use
+        // .debug so they don't grow the in-memory @Published array or spawn a
+        // main-actor hop each call.
+        guard level != .debug else { return }
+
         let entry = LogEntry(message: message, level: level, source: source)
         Task { @MainActor [weak self] in
             self?.append(entry)

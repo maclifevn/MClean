@@ -281,6 +281,11 @@ private struct FileRowView: View {
     }
 
     private var fileIcon: String {
+        // Pure string logic — no filesystem access. This is read on every row
+        // render (scroll, hover, selection, filter keystroke); the previous
+        // fileExists() stat here caused main-thread jank on large scans.
+        // A path ending in "/" is the scanner's directory marker; a component
+        // with no extension is treated as a folder too.
         let ext = (item.name as NSString).pathExtension.lowercased()
         switch ext {
         case "log", "txt": return "doc.text"
@@ -288,11 +293,8 @@ private struct FileRowView: View {
         case "dmg", "iso": return "opticaldisc"
         case "app": return "app"
         case "pkg": return "shippingbox"
+        case "": return item.path.hasSuffix("/") ? "folder" : "doc"
         default:
-            var isDir: ObjCBool = false
-            if FileManager.default.fileExists(atPath: item.path, isDirectory: &isDir), isDir.boolValue {
-                return "folder"
-            }
             return "doc"
         }
     }
