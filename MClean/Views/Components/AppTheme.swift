@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 
 /// User-overridable appearance setting that lives independently of the system
@@ -79,6 +80,27 @@ enum TintGradient {
     )
     static func of(_ color: Color) -> LinearGradient {
         LinearGradient(colors: [color, color.opacity(0.65)], startPoint: .top, endPoint: .bottom)
+    }
+}
+
+/// The single source for MClean's branded app icon inside the UI. Reading the
+/// running bundle's icon keeps onboarding, Settings, permission guidance, and
+/// the menu-bar popover in sync with the icon actually shipped by macOS.
+struct MCleanAppIcon: View {
+    var size: CGFloat
+    var shadow: Bool = false
+
+    var body: some View {
+        Image(nsImage: NSApplication.shared.applicationIconImage)
+            .resizable()
+            .interpolation(.high)
+            .antialiased(true)
+            .scaledToFit()
+            .frame(width: size, height: size)
+            .shadow(color: .black.opacity(shadow ? 0.15 : 0),
+                    radius: shadow ? size * 0.15 : 0,
+                    y: shadow ? size * 0.06 : 0)
+            .accessibilityHidden(true)
     }
 }
 

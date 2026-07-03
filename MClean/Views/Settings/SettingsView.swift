@@ -330,11 +330,7 @@ struct AboutSettingsView: View {
         Form {
             Section {
                 HStack {
-                    if let appIcon = NSImage(named: "AppIcon") {
-                        Image(nsImage: appIcon)
-                            .resizable()
-                            .frame(width: 64, height: 64)
-                    }
+                    MCleanAppIcon(size: 64, shadow: true)
                     VStack(alignment: .leading, spacing: 4) {
                         Text("MClean")
                             .font(.title2.bold())

@@ -100,14 +100,20 @@ struct FDADemoView: View {
         let succeeded = row.isMClean && (frame == .granted || frame == .hold)
 
         return HStack(spacing: 12) {
-            ZStack {
-                RoundedRectangle(cornerRadius: 6, style: .continuous)
-                    .fill(row.isMClean ? Tint.blue.opacity(0.16) : Color.primary.opacity(0.08))
-                Image(systemName: row.systemImage)
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(row.isMClean ? Tint.blue : .secondary)
+            Group {
+                if row.isMClean {
+                    MCleanAppIcon(size: 26)
+                } else {
+                    ZStack {
+                        RoundedRectangle(cornerRadius: 6, style: .continuous)
+                            .fill(Color.primary.opacity(0.08))
+                        Image(systemName: row.systemImage)
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundStyle(.secondary)
+                    }
+                    .frame(width: 26, height: 26)
+                }
             }
-            .frame(width: 26, height: 26)
 
             Text(row.name)
                 .font(.system(size: 13, weight: row.isMClean ? .semibold : .regular))
