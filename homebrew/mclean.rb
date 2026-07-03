@@ -1,6 +1,6 @@
 cask "mclean" do
-  version "1.0.0"
-  sha256 "77c178030f8c2367ee44916dd15ee06307d21dafcd30fd13ce740851c29277dd"
+  version "1.0.1"
+  sha256 "56621b3ae7a7586aab51a385af2501fffc394906cb37dbab68471b7aec753d4f"
 
   url "https://github.com/maclifevn/MClean/releases/download/v#{version}/MClean-#{version}.zip"
   name "MClean"
