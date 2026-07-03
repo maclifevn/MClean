@@ -1,9 +1,10 @@
 <p align="center">
-  <img src="screenshot.png" alt="MClean dashboard — animated storage health ring and live composition donut" width="820">
+  <img src="screenshot.png" alt="Bảng điều khiển MClean — vòng dung lượng và biểu đồ thành phần bộ nhớ" width="820">
 </p>
 
 <p align="center">
-  <b>English</b> |
+  <b>Tiếng Việt</b> |
+  <a href="docs/README.en.md">English</a> |
   <a href="docs/README.ar.md">العربية</a> |
   <a href="docs/README.es.md">Español</a> |
   <a href="docs/README.ja.md">日本語</a> |
@@ -14,41 +15,30 @@
 <h1 align="center">MClean</h1>
 
 <p align="center">
-  <b>Reclaim your Mac.</b><br>
-  Free, open-source uninstaller and cleaner for macOS. No subscription, no telemetry, no upsell.
+  <b>Giành lại dung lượng máy Mac của bạn.</b><br>
+  Trình gỡ ứng dụng và dọn dẹp macOS, miễn phí và mã nguồn mở. Không thuê bao, không thu thập dữ liệu, không quảng cáo mời mua.
 </p>
 
 <p align="center">
-  <a href="https://github.com/maclifevn/MClean/releases/latest"><img src="https://img.shields.io/github/v/release/maclifevn/MClean?style=flat-square&label=Download" alt="Latest Release"></a>
   <img src="https://img.shields.io/badge/macOS-13.0+-blue?style=flat-square" alt="macOS 13.0+">
-  <img src="https://img.shields.io/badge/Signed%20%26%20Notarized-Apple-success?style=flat-square" alt="Signed & Notarized by Apple">
-  <img src="https://img.shields.io/badge/telemetry-none-success?style=flat-square" alt="No telemetry">
-  <a href="LICENSE"><img src="https://img.shields.io/github/license/maclifevn/MClean?style=flat-square" alt="MIT License"></a>
-  <a href="https://github.com/maclifevn/MClean/stargazers"><img src="https://img.shields.io/github/stars/maclifevn/MClean?style=flat-square" alt="Stars"></a>
-  <a href="https://github.com/maclifevn/MClean/releases"><img src="https://img.shields.io/github/downloads/maclifevn/MClean/total?style=flat-square&label=Downloads" alt="Downloads"></a>
+  <img src="https://img.shields.io/badge/theo%20dõi-không-success?style=flat-square" alt="Không theo dõi">
+  <a href="LICENSE"><img src="https://img.shields.io/badge/giấy%20phép-MIT-green?style=flat-square" alt="Giấy phép MIT"></a>
 </p>
 
 <p align="center">
-  <a href="#install">Install</a> -
-  <a href="#why-this-exists">Why this exists</a> -
-  <a href="#how-it-compares">How it compares</a> -
-  <a href="#our-promise">Our promise</a> -
-  <a href="#what-it-does">What it does</a> -
-  <a href="#permissions">Permissions</a> -
-  <a href="#contributing">Contributing</a>
+  <a href="#cài-đặt">Cài đặt</a> ·
+  <a href="#vì-sao-có-mclean">Vì sao có MClean</a> ·
+  <a href="#tính-năng">Tính năng</a> ·
+  <a href="#cam-kết-của-chúng-tôi">Cam kết</a> ·
+  <a href="#quyền-truy-cập">Quyền truy cập</a> ·
+  <a href="#đóng-góp">Đóng góp</a>
 </p>
 
 ---
 
-## Install
+## Cài đặt
 
-```bash
-brew install --cask mclean
-```
-
-Or download the signed, notarized `.dmg` from [Releases](https://github.com/maclifevn/MClean/releases/latest) and drag MClean into `/Applications`. No Gatekeeper warnings, no quarantine workaround.
-
-### Build from source
+Hiện tại bạn xây dựng (build) trực tiếp từ mã nguồn — cần **Xcode 16+** và **macOS 13 trở lên**:
 
 ```bash
 brew install xcodegen
@@ -60,163 +50,101 @@ xcodebuild -project MClean.xcodeproj -scheme MClean -configuration Release \
 open build/Build/Products/Release/MClean.app
 ```
 
-## How it compares
+> Bản cài sẵn (`.dmg`) sẽ được phát hành ở mục **Releases** khi có phiên bản chính thức đầu tiên.
 
-|  | **MClean** | CleanMyMac | Pearcleaner | Mole | OnyX |
-|---|:---:|:---:|:---:|:---:|:---:|
-| Price | **Free** | $40+/yr | Free | CLI free / GUI paid | Free |
-| Open source | **Yes (MIT)** | No | Source-available¹ | CLI only | No |
-| Native Mac GUI | **Yes** | Yes | Yes | Terminal-first | Yes |
-| No telemetry | **Yes** | No | Yes | Yes | Yes |
-| No subscription | **Yes** | No | Yes | — | Yes |
-| Signed + notarized | **Yes** | Yes | Yes | — | Yes |
-| App uninstaller + orphans | **Yes** | Yes | Yes | Partial | No |
-| Trash-only (recoverable) | **Yes** | Partial | Yes | Partial | No |
-| Honest about purgeable space | **Yes** | No | n/a | n/a | n/a |
+## Vì sao có MClean
 
-<sub>¹ Pearcleaner is Apache 2.0 **+ Commons Clause** - source-available but not OSI-approved (you may not sell it). MClean is true MIT. Comparison reflects publicly documented features as of 2026; corrections welcome via PR.</sub>
+Apple bán các máy Mac bản tiêu chuẩn với SSD 256 GB không thể nâng cấp — ổ đĩa được hàn chết vào bo mạch, và mức dung lượng cao hơn có giá đắt hơn cả một chiếc laptop Windows tầm trung. Khi đã trả tiền cho từng gigabyte, mỗi GB đều đáng giá.
 
-## Our promise
+Phần lớn ứng dụng dọn Mac là dạng thuê bao: giấu dung lượng đĩa sau tường phí, mặc định gửi dữ liệu về máy chủ, và hù dọa người dùng ("Phát hiện 47 GB rác!"). MClean thì ngược lại:
 
-A Mac cleaner asks for the deepest permission macOS grants - Full Disk Access - and then deletes your files. That demands a level of trust the category has spent twenty years burning. Here's the contract MClean holds itself to, and you can verify every line of it in the source:
+- **Cài một lần.** Không thuê bao, không dùng thử, không cần tài khoản.
+- **Không thu thập dữ liệu.** Không hề "gọi về nhà". Nó thậm chí không biết bạn tồn tại.
+- **Mã nguồn mở theo giấy phép MIT.** Đọc mã, fork, tự kiểm tra.
+- **Quét trung thực.** "Rác" đúng nghĩa là rác: thư mục cache mà chính hệ điều hành cũng sẽ dọn, tệp mồ côi từ ứng dụng bạn đã xoá, biên nhận cài đặt hỏng, khối DerivedData 4 GB của Xcode từ 2023.
+- **Gỡ ứng dụng đúng cách.** Kéo một ứng dụng, thấy mọi tệp preference, thư mục cache, container, launch agent và nhật ký nó rải khắp thư viện — rồi xoá tất cả cùng lúc.
 
-- **Trash, never `rm`.** Everything MClean removes goes to the Trash via `FileManager.trashItem`. If it was wrong, you drag it back. Nothing is shredded or unlinked.
-- **No telemetry, ever.** No analytics, no crash reporting, no "anonymous usage stats," no network calls to us. The app doesn't know you exist.
-- **No fake urgency.** No dramatized "47 GB of junk detected!" badge, no red alarm counters, no "your Mac is at risk." We show you neutral facts and let you decide.
-- **No overpromising.** We don't claim to "reclaim purgeable space," "boost RAM," or "speed up your Mac" - things no app can reliably do. See the purgeable-space note below.
-- **You review before anything is removed.** Nothing is auto-deleted. Every item shows its real path with Reveal-in-Finder, and high-risk system paths are hard-excluded in code.
-- **Auditable.** It's MIT. The exact code that decides what gets removed is in [`MClean/Services`](MClean/Services) and [`MClean/Logic/Scanning`](MClean/Logic/Scanning). Read it. Fork it. Ship your own.
+## Tính năng
 
-If MClean ever adds telemetry, a paywall on core features, or a fear-based scan, it will have become the thing it was built to replace. Hold us to this.
+### Gỡ ứng dụng
+Quét toàn bộ `/Applications` và `~/Applications`, dùng bộ máy đối chiếu 10 tầng (bundle ID, mã định danh nhóm, entitlements, metadata Spotlight, phát hiện container, suy đoán theo tên công ty, khớp một phần đường dẫn) để tìm mọi tệp ứng dụng để lại. Ba mức độ nhạy — **Nghiêm ngặt, Nâng cao, Sâu**. Ứng dụng hệ thống của Apple tự động bị loại khỏi danh sách gỡ. Bạn cũng có thể chuột phải một ứng dụng trong Finder → **Dịch vụ → Uninstall with MClean** để nhảy thẳng vào quá trình quét tệp liên quan.
 
-## Why this exists
+### Tìm tệp mồ côi
+Duyệt `~/Library` và phát hiện các tệp còn sót lại từ những ứng dụng không còn trên máy. Bộ đối chiếu so với bundle ID và tên chuẩn hoá của mọi ứng dụng đã cài, nên một `~/Library/Containers/com.foo.bar` sót lại từ ứng dụng bạn xoá năm 2022 sẽ hiện rõ.
 
-Apple sells base-model Macs with 256 GB SSDs that you can't upgrade. The Mac mini, the Air, every entry-level MacBook Pro - the drive is soldered down. The next storage tier costs more than a midrange Windows laptop. Once you've paid it, every gigabyte you've already bought matters.
+### Dọn dẹp hệ thống
+Quét thông minh chạy tất cả hạng mục song song, mỗi hạng mục là một bộ quét riêng:
 
-Most Mac cleaners are subscription apps that hide their disk usage behind a paywall, ship telemetry by default, and trade on FUD ("47 GB of junk detected!"). MClean is the opposite:
+- **Rác hệ thống** — cache hệ thống, nhật ký, tệp tạm
+- **Cache người dùng** — phát hiện động, không dùng danh sách ứng dụng cứng
+- **Ứng dụng AI** — nhật ký, cache, và lịch sử (tuỳ chọn) của Ollama và LM Studio
+- **Tệp Mail** — tệp đính kèm email đã tải
+- **Thùng rác** — dọn mọi thùng rác, kể cả ổ đĩa ngoài
+- **Tệp lớn & cũ** — trên 100 MB hoặc cũ hơn 1 năm (không bao giờ tự chọn sẵn)
+- **Rác Xcode** — DerivedData, Archives, cache trình giả lập
+- **Cache Brew** — tôn trọng `HOMEBREW_CACHE` tuỳ chỉnh
+- **Cache Node** — npm, yarn classic, kho content-addressable của pnpm
+- **Cache Docker** — image, container, cache build
 
-- **One-time install.** No subscription, no trial, no account.
-- **No telemetry.** It never phones home. It doesn't even know you exist.
-- **Open source under MIT.** Read the code, fork it, audit it.
-- **Honest scans.** "Junk" means actually-junk: cache directories the OS itself would purge, orphaned files left by apps you've already deleted, broken installer receipts, that 4 GB Xcode DerivedData blob from 2023.
-- **Real uninstalls.** Drag an app, see every preference plist, cache folder, container, launch agent and log file it dropped across your library, remove all of it at once.
-
-## What it does
-
-### App Uninstaller
-Discovers everything in `/Applications` and `~/Applications`, then uses a 10-level matching engine (bundle ID, team identifier, entitlements, Spotlight metadata, container discovery, company-name heuristics, partial path matches) to find every file the app dropped on your disk. Three sensitivity tiers - Strict, Enhanced, Deep - let you choose how aggressive that match is. Apple system apps are excluded from the uninstall list automatically. You can also right-click any app in Finder and choose **Services → Uninstall with MClean** to jump straight into its related-files scan.
-
-### Orphan Finder
-Walks `~/Library` and surfaces files left behind by apps that no longer exist on disk. The matcher compares against bundle identifiers and normalized names of every installed app, so a leftover `~/Library/Containers/com.foo.bar` from an app you deleted in 2022 shows up clearly.
-
-### System Cleaner
-Smart Scan runs every category in parallel. Each category is its own deliberate scanner:
-
-- **System Junk** - system caches, logs, temp files
-- **User Cache** - dynamically discovered, no hardcoded app list
-- **AI Apps** - Ollama and LM Studio logs, caches, opt-in history cleanup
-- **Mail Files** - downloaded mail attachments
-- **Trash Bins** - empties all bins, including external volumes
-- **Large & Old Files** - >100 MB or older than 1 year (never auto-selected)
-- **Xcode Junk** - DerivedData, Archives, simulator caches
-- **Brew Cache** - respects custom `HOMEBREW_CACHE`
-- **Node Cache** - npm, yarn classic, pnpm content-addressable store
-- **Docker Cache** - images, containers, build cache
-
-> **On "purgeable space":** MClean shows your APFS purgeable space in the storage breakdown for transparency, but it deliberately does **not** list it as junk to delete. Purgeable space is reserved and reclaimed by macOS itself - no third-party app can reliably free it, and even the Finder's purgeable figure is known to be inaccurate. Cleaners that claim to "reclaim purgeable space" are overpromising. We'd rather be honest than impressive.
+> **Về "dung lượng có thể giải phóng":** MClean hiển thị dung lượng purgeable của APFS trong bảng phân tích để minh bạch, nhưng **cố ý không** liệt kê nó là rác để xoá. Purgeable do chính macOS dự trữ và tự giải phóng khi cần — không ứng dụng bên thứ ba nào có thể giải phóng nó một cách đáng tin cậy. Những app tuyên bố "thu hồi dung lượng purgeable" là đang hứa hão. Chúng tôi thà trung thực còn hơn gây ấn tượng.
 
 ### Space Lens
-Scan any folder (or your whole home directory) and see its contents as an interactive bubble map — every bubble sized proportionally to the bytes it holds. Click a folder bubble to drill in, use the breadcrumb bar to climb back out, and check items in the side list to move them to the Trash. Sizes are real allocated bytes: hard links are deduplicated, symlinks are never followed, hidden files are included, and app bundles are treated as single items like Finder does. Folders that can't be fully read without Full Disk Access are flagged instead of silently under-counted.
+Quét bất kỳ thư mục nào (hoặc cả thư mục Nhà) và xem nội dung dưới dạng bản đồ bong bóng tương tác — mỗi bong bóng có kích thước tỉ lệ với số byte nó chiếm. Nhấp vào bong bóng thư mục để đi sâu vào, dùng thanh breadcrumb để quay ra, và tick các mục ở danh sách bên để chuyển vào Thùng rác. Kích thước là số byte cấp phát thật: hard link được loại trùng, symlink không bao giờ được đi theo, tệp ẩn được tính, và gói ứng dụng được coi là một mục như Finder. Thư mục không đọc được đầy đủ khi thiếu Toàn quyền Truy cập Đĩa sẽ được đánh dấu thay vì âm thầm tính thiếu.
 
-### Scheduled Cleaning
-Optional. Configurable interval (hourly to monthly), with auto-clean threshold so background runs only fire when there's something meaningful to remove.
+### Dọn dẹp theo lịch
+Tuỳ chọn. Chu kỳ linh hoạt (từng giờ đến từng tháng), có ngưỡng tự dọn để các lần chạy nền chỉ kích hoạt khi thực sự có thứ đáng xoá.
 
-## Permissions
+## Cam kết của chúng tôi
 
-MClean needs **Full Disk Access** to read the locations macOS hides from every app by default - Mail downloads, Safari data, the TCC database, protected app containers. Without it, the cleanup categories miss roughly 70% of what they could find and app uninstalls leave behind everything in `~/Library/Containers`.
+Một app dọn Mac xin quyền sâu nhất mà macOS cấp — Toàn quyền Truy cập Đĩa — rồi xoá tệp của bạn. Đó là mức độ tin tưởng mà cả ngành này đã đánh mất suốt hai mươi năm. Đây là những điều MClean tự ràng buộc, và bạn có thể kiểm chứng từng dòng trong mã nguồn:
 
-The first-launch onboarding walks you through granting it with an animated preview of the exact toggle you need to flip. If you skip it, the dashboard surfaces a single-click "Set up" pill. If a cleanup fails because of a permission issue, MClean opens System Settings, reveals its bundle in Finder so you can drag it into the FDA list, polls the permission state every second, and auto-retries the failed batch the moment you grant access. You never have to re-select anything.
+- **Luôn dùng Thùng rác, không bao giờ `rm`.** Mọi thứ MClean xoá đều vào Thùng rác qua `FileManager.trashItem`. Xoá nhầm thì kéo lại. Không có gì bị huỷ vĩnh viễn.
+- **Không bao giờ thu thập dữ liệu.** Không phân tích, không báo cáo sự cố, không "thống kê ẩn danh", không gọi mạng về chúng tôi.
+- **Không hù dọa giả tạo.** Không huy hiệu "47 GB rác!", không bộ đếm báo động đỏ, không "máy Mac của bạn đang gặp nguy". Chúng tôi đưa sự thật trung tính và để bạn quyết định.
+- **Bạn xem lại trước khi bất cứ thứ gì bị xoá.** Không tự động xoá. Mỗi mục hiện đường dẫn thật với Hiện-trong-Finder, các đường dẫn hệ thống rủi ro cao được loại cứng trong mã.
+- **Kiểm tra được.** Giấy phép MIT. Mã quyết định xoá gì nằm ở [`MClean/Services`](MClean/Services) và [`MClean/Logic/Scanning`](MClean/Logic/Scanning). Đọc. Fork. Tự phát hành bản của bạn.
 
-What MClean does *not* do:
-- It does not collect telemetry, crash reports, or usage analytics.
-- It does not require a network connection to operate.
-- It does not move data anywhere except the Trash.
+## Quyền truy cập
 
-## Troubleshooting
+MClean cần **Toàn quyền Truy cập Đĩa** để đọc các vị trí mà macOS mặc định ẩn khỏi mọi ứng dụng — tệp Mail tải về, dữ liệu Safari, cơ sở dữ liệu TCC, các container ứng dụng được bảo vệ. Thiếu quyền này, việc dọn dẹp bỏ sót khoảng 70% và gỡ ứng dụng sẽ để lại mọi thứ trong `~/Library/Containers`.
 
-### Launchpad / Dock shows a stale or dull MClean icon
+Màn hình khởi động lần đầu sẽ hướng dẫn bạn cấp quyền. Nếu một thao tác dọn thất bại vì thiếu quyền, MClean mở Cài đặt Hệ thống, hiện app trong Finder để bạn kéo vào danh sách, theo dõi trạng thái quyền mỗi giây và tự thử lại đúng lô bị lỗi ngay khi bạn cấp quyền — bạn không phải chọn lại gì cả.
 
-macOS aggressively caches app icons in LaunchServices. After a Homebrew **reinstall or upgrade** the Dock and Launchpad can keep showing the old cached icon. MClean's cask now runs `lsregister -f` on install to refresh it automatically, but if a stale icon persists, reset the cache manually:
+MClean **không** làm những việc sau:
+- Không thu thập dữ liệu theo dõi, báo cáo sự cố hay phân tích sử dụng.
+- Không cần kết nối mạng để hoạt động.
+- Không chuyển dữ liệu đi đâu ngoài Thùng rác.
 
-```bash
-# Clear the icon caches and rebuild the LaunchServices database
-sudo rm -rfv /Library/Caches/com.apple.iconservices.store
-sudo find /private/var/folders/ \( -name com.apple.dock.iconcache -or -name com.apple.iconservices \) -exec rm -rfv {} \; 2>/dev/null
-/System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/LaunchServices.framework/Versions/A/Support/lsregister \
-  -kill -r -domain local -domain user -domain system
-killall Dock; killall Finder
-```
-
-Give it a minute to re-seed, then open MClean once. If it still sticks, a restart (or Safe Mode boot) forces a full rebuild.
-
-
-## Architecture
+## Kiến trúc
 
 ```
 MClean/
-  Logic/Scanning/     - Heuristic scan engine, locations database, conditions
-  Logic/Utilities/    - Structured logging
-  Models/             - Data models, typed errors
-  Services/           - Scan engine, cleaning engine, permission coordinator, scheduler
-  ViewModels/         - Centralized app state
-  Views/              - Native SwiftUI views
-    Apps/             - App uninstaller views
-    Components/       - Shared components (FDA demo, permission sheet, theme)
-    Orphans/          - Orphan finder
-    Settings/         - Native Form-based settings
+  Logic/Scanning/     - Bộ máy quét suy đoán, cơ sở dữ liệu vị trí, điều kiện
+  Logic/Utilities/    - Ghi nhật ký có cấu trúc, tính kích thước tệp
+  Models/             - Mô hình dữ liệu, lỗi có kiểu
+  Services/           - Bộ quét, bộ dọn, điều phối quyền, bộ lập lịch, Space Lens
+  ViewModels/         - Trạng thái ứng dụng tập trung
+  Views/              - Giao diện SwiftUI thuần
 ```
 
-Key components:
-- **AppPathFinder** - 10-level heuristic matching engine for discovering app-related files
-- **Locations** - 120+ macOS filesystem search paths
-- **Conditions** - 25 per-app matching rules for edge cases (Xcode, Chrome, VS Code, etc.)
-- **PermissionCoordinator** - Single source of truth for FDA prompts, polling, and post-grant retries
-- **FullDiskAccessManager** - TCC probe + registration; broad probe paths (Mail, Safari, Messages, AddressBook, Calendars) so macOS catalogs the bundle reliably
-- **CleaningEngine** - Symlink-resistant deletion with an allow-list, NSAppleScript-based admin escalation for root-owned items, NUL-separated path staging for xargs
+## Bảo mật
 
-## Security
+- Chống tấn công symlink: đường dẫn được phân giải trước khi kiểm tra, phân giải lại ngay trước khi xoá để đóng khe hở TOCTOU.
+- Dọn theo danh sách cho phép: đường dẫn nằm ngoài thư mục an toàn được chỉ định sẽ bị từ chối.
+- Bảo vệ ứng dụng hệ thống: không thể gỡ các gói của Apple.
+- Mọi thao tác xoá đều yêu cầu xác nhận rõ ràng theo mặc định.
 
-- Symlink attack prevention: paths are resolved before validation, re-resolved immediately before unlink to close TOCTOU windows.
-- Allow-list cleaning: a path that doesn't sit inside an explicit safe-root is refused, even for the user-level pass.
-- Admin escalation is gated by a *narrower* allow-list (app bundles, package receipts, launch plists) than the normal cleaner — root-owned items can only be removed inside those roots.
-- System app protection: Apple's bundles cannot be uninstalled, regardless of selection.
-- All destructive operations require explicit confirmation by default. The toggle that disables that confirmation is buried in Settings.
+Nếu bạn phát hiện lỗ hổng, vui lòng mở một security advisory riêng tư thay vì issue công khai.
 
-If you find a vulnerability, please open a private security advisory rather than a public issue.
+## Đóng góp
 
-## Contributing
+Rất hoan nghênh pull request. Xem [CONTRIBUTING.md](CONTRIBUTING.md).
 
-Pull requests welcome. See [CONTRIBUTING.md](CONTRIBUTING.md).
+Đặc biệt mong muốn:
+- Bộ lọc kích thước/ngày theo hạng mục
+- Mở rộng phạm vi kiểm thử XCTest cho `AppState` và bộ máy quét
+- Thêm ngôn ngữ (hiện có: vi, en, ar, es, ja, pt-BR, zh-Hans, zh-Hant)
 
-Especially welcome:
-- Per-category size and date filter presets
-- Wider XCTest coverage for `AppState` and the scan engine
-- Translations beyond the current set (en, ar, es, ja, pt-BR, zh-Hans, zh-Hant)
-- App icon design
+## Giấy phép
 
-
-## Star History
-
-If MClean saved you some disk space, a star helps other people find it.
-
-<a href="https://star-history.com/#maclifevn/MClean&Date">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=maclifevn/MClean&type=Date&theme=dark" />
-    <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=maclifevn/MClean&type=Date" />
-    <img alt="MClean star history chart" src="https://api.star-history.com/svg?repos=maclifevn/MClean&type=Date" width="720" />
-  </picture>
-</a>
-
-## License
-
-MIT. See [LICENSE](LICENSE). Use it, fork it, ship it under your own name if you want - the only thing the license asks is that the notice stays.
+MIT. Xem [LICENSE](LICENSE). Dùng, fork, phát hành dưới tên bạn nếu muốn — điều duy nhất giấy phép yêu cầu là giữ lại thông báo bản quyền.
