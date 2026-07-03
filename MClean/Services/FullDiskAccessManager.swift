@@ -160,6 +160,10 @@ final class FullDiskAccessManager {
     /// Returns true if the reset command exited cleanly.
     @discardableResult
     func resetFullDiskAccess() -> Bool {
+        #if APPSTORE
+        // tccutil is pointless under the sandbox; FDA never applies there.
+        return false
+        #else
         let bundleID = Bundle.main.bundleIdentifier ?? "com.maclife.mclean"
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/usr/bin/tccutil")
@@ -171,5 +175,6 @@ final class FullDiskAccessManager {
         } catch {
             return false
         }
+        #endif
     }
 }

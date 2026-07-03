@@ -96,7 +96,13 @@ class SchedulerService: ObservableObject {
 
     // MARK: - LaunchAgent Management
 
+    // The App Store sandbox blocks writing to ~/Library/LaunchAgents and
+    // running launchctl, so both operations are compiled out there. A
+    // sandboxed scheduler would need SMAppService with a bundled agent.
     func installLaunchAgent() {
+        #if APPSTORE
+        return
+        #else
         let plistName = "com.maclife.mclean.scheduler"
         let plistPath = FileManager.default.homeDirectoryForCurrentUser
             .appendingPathComponent("Library/LaunchAgents/\(plistName).plist")
@@ -131,9 +137,13 @@ class SchedulerService: ObservableObject {
         task.arguments = ["load", plistPath.path]
         try? task.run()
         task.waitUntilExit()
+        #endif
     }
 
     func uninstallLaunchAgent() {
+        #if APPSTORE
+        return
+        #else
         let plistName = "com.maclife.mclean.scheduler"
         let plistPath = FileManager.default.homeDirectoryForCurrentUser
             .appendingPathComponent("Library/LaunchAgents/\(plistName).plist")
@@ -145,5 +155,6 @@ class SchedulerService: ObservableObject {
         task.waitUntilExit()
 
         try? FileManager.default.removeItem(at: plistPath)
+        #endif
     }
 }

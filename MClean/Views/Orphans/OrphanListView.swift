@@ -257,6 +257,10 @@ struct OrphanListView: View {
 
     private func removeWithAdminPrivileges(_ urls: [URL]) -> Bool {
         guard !urls.isEmpty else { return true }
+        #if APPSTORE
+        // Privilege escalation is forbidden under the App Store sandbox.
+        return false
+        #else
         guard urls.allSatisfy({ OrphanSafetyPolicy.isSafeCandidate($0) }) else { return false }
 
         // Quote path for a POSIX shell command.
@@ -283,6 +287,7 @@ struct OrphanListView: View {
         } catch {
             return false
         }
+        #endif
     }
 }
 

@@ -118,6 +118,13 @@ actor CleaningEngine {
     func cleanWithAdminPrivileges(items: [CleanableItem]) async -> CleaningResult {
         var result = CleaningResult()
 
+        #if APPSTORE
+        // The App Store sandbox forbids privilege escalation, so the admin
+        // pass is compiled out entirely; protected items simply survive.
+        Logger.shared.log("Admin pass unavailable in the App Store build; \(items.count) item(s) skipped", level: .warning)
+        result.errors.append("Removing system-protected files isn't available in the App Store version.")
+        return result
+        #else
         Logger.shared.log("Admin pass starting with \(items.count) item(s)", level: .info)
 
         // Re-validate. Don't trust the caller — anything not on the allow-list
@@ -197,6 +204,7 @@ actor CleaningEngine {
         }
         Logger.shared.log("Admin pass complete: \(result.itemsCleaned) deleted, \(result.errors.count) survived", level: .info)
         return result
+        #endif
     }
 
     // MARK: - Purgeable Space

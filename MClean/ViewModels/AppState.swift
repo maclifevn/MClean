@@ -575,7 +575,7 @@ final class AppState: ObservableObject {
 
     // MARK: - Orphan ignore list (#114)
 
-    static let ignoredOrphansKey = "settings.orphans.ignored"
+    nonisolated static let ignoredOrphansKey = "settings.orphans.ignored"
 
     /// Number of paths currently on the "always ignore" list. Read from
     /// UserDefaults each access so the Settings row tracks live changes.

@@ -119,12 +119,16 @@ struct MCleanApp: App {
         .defaultSize(width: 1000, height: 680)
         .commands {
             CommandGroup(replacing: .newItem) {}
+            // The App Store handles updates itself, and pointing users at
+            // GitHub releases from a Store build violates review guidelines.
+            #if !APPSTORE
             CommandMenu("Updates") {
                 Button("Check for Updates") {
                     UpdateService.shared.checkForUpdates()
                 }
                 .keyboardShortcut("u", modifiers: [.command, .shift])
             }
+            #endif
         }
 
         Settings {

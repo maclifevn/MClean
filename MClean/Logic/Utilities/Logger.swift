@@ -28,7 +28,9 @@ enum LogLevel: String, Sendable, CaseIterable {
 @MainActor
 final class Logger: ObservableObject {
 
-    static let shared = Logger()
+    // `log` is nonisolated and hops to the main actor internally, so handing
+    // the reference itself across isolation domains is safe.
+    nonisolated static let shared = Logger()
 
     @Published private(set) var entries: [LogEntry] = []
 
@@ -36,7 +38,7 @@ final class Logger: ObservableObject {
 
     private let osLogger: os.Logger
 
-    private init() {
+    private nonisolated init() {
         let subsystem = Bundle.main.bundleIdentifier ?? "com.maclife.mclean"
         self.osLogger = os.Logger(subsystem: subsystem, category: "general")
     }

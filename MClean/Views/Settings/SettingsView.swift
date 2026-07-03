@@ -353,8 +353,8 @@ struct AboutSettingsView: View {
             }
 
             Section {
-                Link("GitHub Repository", destination: URL(string: "https://github.com/maclifevn/MClean")!)
-                Link("Report an Issue", destination: URL(string: "https://github.com/maclifevn/MClean/issues")!)
+                Link("GitHub Repository", destination: URL(string: "https://github.com/PhamHungTien/MClean")!)
+                Link("Report an Issue", destination: URL(string: "https://github.com/PhamHungTien/MClean/issues")!)
             }
 
             Section {

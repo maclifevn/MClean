@@ -14,6 +14,10 @@
 	<string>MClean</string>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
+	<key>CFBundleIconFile</key>
+	<string>MClean</string>
+	<key>CFBundleIconName</key>
+	<string>MClean</string>
 	<key>CFBundleShortVersionString</key>
 	<string>$(MARKETING_VERSION)</string>
 	<key>CFBundleVersion</key>
@@ -32,8 +36,6 @@
 	<string>MClean needs access to your Downloads to find junk and orphaned files.</string>
 	<key>NSRemovableVolumesUsageDescription</key>
 	<string>MClean needs access to removable volumes to scan for junk files.</string>
-	<key>NSSystemAdministrationUsageDescription</key>
-	<string>MClean needs system administration access to clean caches and uninstall apps completely.</string>
 	<key>NSAppleEventsUsageDescription</key>
 	<string>MClean uses Apple Events to interact with Finder when revealing files.</string>
 	<key>NSServices</key>
