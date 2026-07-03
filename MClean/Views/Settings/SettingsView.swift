@@ -41,6 +41,7 @@ struct GeneralSettingsView: View {
     @AppStorage("settings.general.searchSensitivity") private var sensitivity: SearchSensitivity = .enhanced
     @AppStorage("settings.general.confirmBeforeDelete") private var confirmBeforeDelete = true
     @AppStorage("settings.general.menuBarMonitor") private var menuBarMonitor = true
+    @AppStorage("settings.general.hideDockIcon") private var hideDockIcon = false
     @AppStorage(Haptics.soundEffectsKey) private var soundEffects = true
     @AppStorage(AppLanguage.preferenceKey) private var appLanguageRaw = AppLanguage.current.rawValue
     @State private var languageNeedsRelaunch = false
@@ -95,6 +96,13 @@ struct GeneralSettingsView: View {
                     .foregroundStyle(.secondary)
             }
 
+            Section("Dock") {
+                Toggle("Hide Dock icon", isOn: hideDockIconBinding)
+                Text("Hides MClean from the Dock and the ⌘Tab app switcher. Reopen it from the menu-bar monitor or by launching MClean again.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
             Section("Folder Access") {
                 if !sandboxAccess.hasFullScanAccess {
                     Text("Select the startup disk to preserve the original Smart Scan coverage. macOS asks you to confirm it in the native file picker.")
@@ -133,6 +141,17 @@ struct GeneralSettingsView: View {
         .formStyle(.grouped)
         .animation(reduceMotion ? nil : .spring(response: 0.35, dampingFraction: 0.85),
                    value: languageNeedsRelaunch)
+    }
+
+    private var hideDockIconBinding: Binding<Bool> {
+        Binding(
+            get: { hideDockIcon },
+            set: { newValue in
+                hideDockIcon = newValue
+                // Tell AppDelegate to switch the activation policy live.
+                NotificationCenter.default.post(name: .mCleanDockIconChanged, object: nil)
+            }
+        )
     }
 
     private var menuBarMonitorBinding: Binding<Bool> {

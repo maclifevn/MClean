@@ -33,6 +33,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 self, selector: #selector(syncMenuBarMonitor),
                 name: .mCleanMenuBarMonitorChanged, object: nil
             )
+            syncDockIconVisibility()
+            NotificationCenter.default.addObserver(
+                self, selector: #selector(syncDockIconVisibility),
+                name: .mCleanDockIconChanged, object: nil
+            )
         }
         // Register the Finder Services provider so "Uninstall with MClean"
         // appears when an .app bundle is right-clicked (issue #109).
@@ -64,6 +69,20 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         )
     }
 
+    /// Match the activation policy to the "Hide Dock icon" Settings toggle.
+    /// `.accessory` removes MClean from the Dock and the ⌘Tab switcher while
+    /// its windows keep working. Applied at launch and whenever the toggle
+    /// flips, so no relaunch is needed.
+    @objc func syncDockIconVisibility() {
+        let hide = UserDefaults.standard.bool(forKey: "settings.general.hideDockIcon")
+        let policy: NSApplication.ActivationPolicy = hide ? .accessory : .regular
+        guard NSApp.activationPolicy() != policy else { return }
+        NSApp.setActivationPolicy(policy)
+        // Switching to .accessory drops key-window status; bring MClean back
+        // to the front so the Settings window the user is in stays focused.
+        NSApp.activate(ignoringOtherApps: true)
+    }
+
     /// Create or tear down the menu-bar status item to match the current
     /// Settings toggle. Posted to whenever the toggle flips so it takes effect
     /// without a relaunch.
@@ -82,6 +101,9 @@ extension Notification.Name {
     /// Posted when the "Show system monitor in menu bar" Settings toggle flips,
     /// so AppDelegate can add/remove the status item live.
     static let mCleanMenuBarMonitorChanged = Notification.Name("MClean.MenuBarMonitorChanged")
+    /// Posted when the "Hide Dock icon" Settings toggle flips, so AppDelegate
+    /// can switch the activation policy live.
+    static let mCleanDockIconChanged = Notification.Name("MClean.DockIconChanged")
     static let mCleanSmartScanRequested = Notification.Name("MClean.SmartScanRequested")
 }
 

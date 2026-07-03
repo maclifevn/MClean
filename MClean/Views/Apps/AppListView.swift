@@ -28,12 +28,12 @@ struct AppListView: View {
             // HSplitView positions could compress the pane below its declared
             // minimum or let it crowd the app-wide sidebar.
             appTable
-                .frame(width: 300)
+                .frame(width: 396)
 
             Divider()
 
             fileDetail
-                .frame(minWidth: 380, maxWidth: .infinity)
+                .frame(minWidth: 340, maxWidth: .infinity)
         }
         .searchable(text: $searchText, prompt: "Search apps")
         .navigationTitle(installedAppsTitle)
@@ -89,14 +89,18 @@ struct AppListView: View {
                         }
                         .help(app.appName)
                     }
-                    .width(min: 170, ideal: 210, max: 240)
+                    .width(min: 210, ideal: 238, max: 244)
 
                     TableColumn("Size", value: \.size) { app in
                         Text(app.formattedSize)
+                            .font(.system(size: 13))
                             .monospacedDigit()
                             .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                            .frame(maxWidth: .infinity, alignment: .trailing)
+                            .help(app.formattedSize)
                     }
-                    .width(min: 64, ideal: 72, max: 82)
+                    .width(min: 118, ideal: 118, max: 118)
                 }
                 .onChange(of: selection) { newValue in
                     guard let id = newValue,
