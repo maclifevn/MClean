@@ -82,7 +82,7 @@ Optional. Configurable interval with an auto-clean threshold.
 
 ## Permissions
 
-MClean needs **Full Disk Access** to read locations macOS hides from every app by default — Mail downloads, Safari data, the TCC database, protected app containers. Without it, cleanup misses roughly 70% of what it could find. First-launch onboarding walks you through granting it. MClean collects no telemetry, needs no network connection, and moves data nowhere except the Trash.
+MClean asks you to choose the folders or disk you want scanned through the native macOS file picker. The app stores that approval as a security-scoped bookmark, so future scans can cover the same user-approved scope without asking for broad system privacy overrides. MClean does not send analytics or personal data, needs no network connection, and moves data nowhere except the Trash.
 
 ## Security
 

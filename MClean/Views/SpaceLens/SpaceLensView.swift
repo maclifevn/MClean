@@ -223,31 +223,13 @@ private struct SpaceLensResultView: View {
     // MARK: Action bar
 
     private var actionBar: some View {
-        HStack(spacing: 12) {
-            if lens.selection.isEmpty {
-                Text("Nothing selected")
-                    .font(.system(size: 12))
-                    .foregroundStyle(.secondary)
-            } else {
-                Text(String(format: String(localized: "Selected: %@"),
-                            ByteCountFormatter.string(fromByteCount: lens.selectedSize, countStyle: .file)))
-                    .font(.system(size: 12, weight: .semibold))
-                    .monospacedDigit()
-            }
-            Spacer()
-            Button("Rescan") {
-                if let root = lens.rootNode { lens.scan(root.url) }
-            }
-            .buttonStyle(.bordered)
-            Button {
-                showTrashConfirmation = true
-            } label: {
-                Label("Move to Trash", systemImage: "trash.fill")
-            }
-            .buttonStyle(GlowProminentButtonStyle(tint: Tint.red, gradient: TintGradient.destructive))
-            .disabled(lens.selection.isEmpty)
+        ViewThatFits(in: .horizontal) {
+            regularActionBarContent
+            compactActionBarContent
+            iconOnlyActionBarContent
         }
-        .padding(.horizontal, 16)
+        .padding(.leading, 16)
+        .padding(.trailing, 22)
         .padding(.vertical, 10)
         .background(.bar)
         .confirmationDialog(
@@ -263,6 +245,83 @@ private struct SpaceLensResultView: View {
         } message: {
             Text("Items can be restored from the Trash.")
         }
+    }
+
+    private var regularActionBarContent: some View {
+        HStack(spacing: 12) {
+            selectionSummary
+            Spacer(minLength: 12)
+            rescanButton
+            trashButton(title: "Move to Trash")
+        }
+    }
+
+    private var compactActionBarContent: some View {
+        HStack(spacing: 8) {
+            selectionSummary
+            Spacer(minLength: 8)
+            rescanButton
+            trashButton(title: "Trash")
+                .help("Move to Trash")
+        }
+    }
+
+    private var iconOnlyActionBarContent: some View {
+        HStack(spacing: 8) {
+            selectionSummary
+            Spacer(minLength: 6)
+            rescanButton
+            Button {
+                showTrashConfirmation = true
+            } label: {
+                Image(systemName: "trash.fill")
+                    .frame(width: 16, height: 16)
+                    .accessibilityLabel(Text("Move to Trash"))
+            }
+            .buttonStyle(GlowProminentButtonStyle(tint: Tint.red, gradient: TintGradient.destructive))
+            .disabled(lens.selection.isEmpty)
+            .help("Move to Trash")
+            .fixedSize(horizontal: true, vertical: false)
+        }
+    }
+
+    private var selectionSummary: some View {
+        Group {
+            if lens.selection.isEmpty {
+                Text("Nothing selected")
+                    .font(.system(size: 12))
+                    .foregroundStyle(.secondary)
+            } else {
+                Text(String(format: String(localized: "Selected: %@"),
+                            ByteCountFormatter.string(fromByteCount: lens.selectedSize, countStyle: .file)))
+                    .font(.system(size: 12, weight: .semibold))
+                    .monospacedDigit()
+            }
+        }
+        .lineLimit(1)
+        .truncationMode(.middle)
+        .frame(minWidth: 0, alignment: .leading)
+    }
+
+    private var rescanButton: some View {
+        Button("Rescan") {
+            if let root = lens.rootNode { lens.scan(root.url) }
+        }
+        .buttonStyle(.bordered)
+        .controlSize(.regular)
+        .fixedSize(horizontal: true, vertical: false)
+    }
+
+    private func trashButton(title: LocalizedStringKey) -> some View {
+        Button {
+            showTrashConfirmation = true
+        } label: {
+            Label(title, systemImage: "trash.fill")
+                .lineLimit(1)
+        }
+        .buttonStyle(GlowProminentButtonStyle(tint: Tint.red, gradient: TintGradient.destructive))
+        .disabled(lens.selection.isEmpty)
+        .fixedSize(horizontal: true, vertical: false)
     }
 }
 

@@ -8,9 +8,8 @@ options:
   defaultConfig: Release
 
 # AppStore duplicates Release but swaps in the sandboxed entitlements and the
-# APPSTORE compilation condition, which compiles out privilege escalation,
-# launchctl, and the Full Disk Access flow (forbidden or useless under the
-# Mac App Store sandbox).
+# APPSTORE compilation condition, keeping privileged helpers and launchctl-only
+# flows out of the Mac App Store build.
 configs:
   Debug: debug
   Release: release
@@ -71,8 +70,9 @@ targets:
         SWIFT_EMIT_LOC_STRINGS: "YES"
         LD_RUNPATH_SEARCH_PATHS: "$(inherited) @executable_path/../Frameworks"
       # Debug signing intentionally NOT disabled: a real Apple Development
-      # signature keeps the TCC/FDA grant stable across rebuilds (ad-hoc
-      # signatures change cdhash every build and macOS drops the grant).
+      # signature keeps security-scoped bookmarks stable across rebuilds
+      # (ad-hoc signatures change cdhash every build and macOS may invalidate
+      # saved access).
 
   MCleanTests:
     type: bundle.unit-test

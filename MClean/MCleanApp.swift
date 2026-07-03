@@ -116,6 +116,7 @@ struct MCleanApp: App {
             // this window after it's been closed (the popover lives outside the
             // scene graph and can't use openWindow itself).
             .background(WindowOpenerCapture())
+            .mCleanWindowChrome()
         }
         .windowStyle(.automatic)
         .windowToolbarStyle(.unified)
@@ -146,5 +147,20 @@ struct MCleanApp: App {
         // unconditional one sets up status-item machinery that hangs the XCTest
         // host. The AppKit controller is only created when enabled and never
         // under tests, sidestepping both problems.
+    }
+}
+
+private extension View {
+    @ViewBuilder
+    func mCleanWindowChrome() -> some View {
+        if #available(macOS 15.0, *) {
+            // Keep the logical window title for macOS/window management, but
+            // don't draw a standalone "MClean" title in the toolbar. Feature
+            // panes own their own headings/actions, which keeps Dashboard and
+            // Space Lens visually aligned with the other tabs.
+            self.toolbar(removing: .title)
+        } else {
+            self
+        }
     }
 }
