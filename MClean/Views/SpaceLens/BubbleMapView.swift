@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 
 /// The Space Lens bubble map: the current node's largest children as
@@ -161,6 +162,11 @@ private struct SpaceLensBubble: View {
         .animation(reduceMotion ? nil : MotionTokens.snappy, value: hovering)
         .onHover { hovering = $0 }
         .onTapGesture(perform: onTap)
+        .contextMenu {
+            Button("Reveal in Finder") {
+                NSWorkspace.shared.activateFileViewerSelecting([node.url])
+            }
+        }
         .help(Text(verbatim: "\(node.name) — \(node.formattedSize)"))
         .accessibilityLabel(Text(verbatim: node.name))
         .accessibilityValue(Text(verbatim: node.formattedSize))
