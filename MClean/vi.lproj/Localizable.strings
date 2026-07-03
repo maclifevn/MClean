@@ -367,9 +367,12 @@
 "Show system monitor in menu bar" = "Hiện theo dõi hệ thống trên thanh menu";
 "Live CPU, memory, and disk meters in the menu bar. MClean keeps running in the background while this is on." = "Đồng hồ CPU, bộ nhớ và đĩa trực tiếp trên thanh menu. MClean tiếp tục chạy nền khi bật tính năng này.";
 "CPU" = "CPU";
+"CPU %lld%%" = "CPU %lld%%";
 "Memory" = "Bộ nhớ";
 "Disk" = "Đĩa";
+"Live" = "Trực tiếp";
 "Open MClean" = "Mở MClean";
+"Settings…" = "Cài đặt…";
 "Quit MClean" = "Thoát MClean";
 
 /* Space Lens */

@@ -26,6 +26,9 @@ struct MainWindow: View {
             appState.checkFullDiskAccess()
             permission.refreshStatus()
         }
+        .onReceive(NotificationCenter.default.publisher(for: .mCleanSmartScanRequested)) { _ in
+            consumeMenuBarSmartScanRequest()
+        }
         .onChange(of: appState.pendingExternalApp) { app in
             // A right-clicked app arrived via Finder Services — surface the
             // Installed Apps view so its related-files scan is visible.
@@ -41,6 +44,7 @@ struct MainWindow: View {
                 selectedSection = .apps
                 appState.pendingExternalApp = nil
             }
+            consumeMenuBarSmartScanRequest()
         }
         .onChange(of: appState.cleanErrorIsFDAFixable) { isFDAFixable in
             // Auto-route FDA-fixable clean errors straight into the rich
@@ -69,6 +73,13 @@ struct MainWindow: View {
         )) {
             PermissionSheet()
         }
+    }
+
+    private func consumeMenuBarSmartScanRequest() {
+        guard MenuBarQuickActionBuffer.smartScanRequested else { return }
+        MenuBarQuickActionBuffer.smartScanRequested = false
+        selectedSection = .cleaning(.smartScan)
+        appState.startSmartScan()
     }
 
     // MARK: - Sidebar

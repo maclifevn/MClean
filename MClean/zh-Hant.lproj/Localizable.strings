@@ -367,9 +367,12 @@
 "Show system monitor in menu bar" = "在選單列中顯示系統監視器";
 "Live CPU, memory, and disk meters in the menu bar. MClean keeps running in the background while this is on." = "在選單列中即時顯示 CPU、記憶體和磁碟使用情況。開啟時 MClean 會在背景持續執行。";
 "CPU" = "CPU";
+"CPU %lld%%" = "CPU %lld%%";
 "Memory" = "記憶體";
 "Disk" = "磁碟";
+"Live" = "即時";
 "Open MClean" = "開啟 MClean";
+"Settings…" = "設定…";
 "Quit MClean" = "結束 MClean";
 
 /* Space Lens */
