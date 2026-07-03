@@ -48,7 +48,7 @@ private struct SpaceLensContent: View {
                 actionLabel: "Scan Home Folder",
                 tint: Tint.cyan
             )
-            Button("Choose Folder…") { lens.chooseFolderAndScan() }
+            Button("Choose Another Folder…") { lens.chooseFolderAndScan() }
                 .buttonStyle(.bordered)
                 .padding(.bottom, 40)
         }
@@ -66,7 +66,7 @@ private struct SpaceLensScanningView: View {
             ProgressView()
                 .controlSize(.large)
             Text("Scanning…")
-                .font(.title3.bold())
+                .font(.title3.weight(.semibold))
             // Both readouts observe the standalone high-frequency objects so
             // the ~10Hz churn re-renders only these labels (issues #119, #120).
             SpaceLensProgressReadout(progress: lens.progress)

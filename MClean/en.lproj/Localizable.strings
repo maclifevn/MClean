@@ -8,23 +8,15 @@
 "MClean" = "MClean";
 "Ready to clean" = "Ready to clean";
 "Limited access" = "Limited access";
-"Full Disk Access granted" = "Full Disk Access granted";
-"Grant FDA in Settings" = "Grant FDA in Settings";
 "Select a category from the sidebar to get started." = "Select a category from the sidebar to get started.";
 
-/* FDA toast + clean error alert (MainWindow) */
 "Couldn't clean everything" = "Couldn't clean everything";
 "Open System Settings" = "Open System Settings";
 "OK" = "OK";
-"Full Disk Access required" = "Full Disk Access required";
 "macOS blocks MClean from cleaning caches and uninstalling apps until you grant access." = "macOS blocks MClean from cleaning caches and uninstalling apps until you grant access.";
 "Grant Access" = "Grant Access";
 
 /* Permission Sheet */
-"Grant Full Disk Access" = "Grant Full Disk Access";
-"%lld item(s) need Full Disk Access" = "%lld item(s) need Full Disk Access";
-"Uninstalling %@: %lld file(s) need Full Disk Access" = "Uninstalling %@: %lld file(s) need Full Disk Access";
-"%lld item(s) need Full Disk Access to remove. Tap Grant Access to fix in one step." = "%lld item(s) need Full Disk Access to remove. Tap Grant Access to fix in one step.";
 "Couldn't remove %@%@. They may be in use or protected by macOS." = "Couldn't remove %@%@. They may be in use or protected by macOS.";
 " and %lld more" = " and %lld more";
 "Access granted. Retrying…" = "Access granted. Retrying…";
@@ -81,7 +73,6 @@
 "Found so far" = "Found so far";
 "By category" = "By category";
 "%@ is using %@" = "%@ is using %@";
-"Grant Full Disk Access for full results" = "Grant Full Disk Access for full results";
 "Without it, most caches and uninstall flows fail." = "Without it, most caches and uninstall flows fail.";
 "Action" = "Action";
 "Scanning your Mac" = "Scanning your Mac";
@@ -171,11 +162,8 @@
 "Remove apps and all their files" = "Remove apps and all their files";
 "Orphan Finder" = "Orphan Finder";
 "Find leftovers from deleted apps" = "Find leftovers from deleted apps";
-"Full Disk Access" = "Full Disk Access";
-"MClean needs Full Disk Access to uninstall apps, find leftover files, and clean protected caches." = "MClean needs Full Disk Access to uninstall apps, find leftover files, and clean protected caches.";
 "We'll guide you through the next steps." = "We'll guide you through the next steps.";
 "In System Settings, do this:" = "In System Settings, do this:";
-"Privacy & Security → Full Disk Access" = "Privacy & Security → Full Disk Access";
 "Find **MClean** and turn the toggle on" = "Find **MClean** and turn the toggle on";
 "Authenticate with Touch ID or your password" = "Authenticate with Touch ID or your password";
 "Reopen Settings" = "Reopen Settings";
@@ -189,7 +177,6 @@
 "MClean can now manage protected files." = "MClean can now manage protected files.";
 "You're Ready" = "You're Ready";
 "%lld/%lld protected locations accessible" = "%lld/%lld protected locations accessible";
-"Some features will be limited. You can grant Full Disk Access later in System Settings." = "Some features will be limited. You can grant Full Disk Access later in System Settings.";
 "Trash" = "Trash";
 "Mail Data" = "Mail Data";
 "Safari Data" = "Safari Data";
@@ -324,7 +311,6 @@
 
 /* Drag handle */
 "Drag to the Settings list" = "Drag to the Settings list";
-"Drag this icon into the Full Disk Access list in System Settings." = "Drag this icon into the Full Disk Access list in System Settings.";
 "Tip: drag the icon on the left straight into the list." = "Tip: drag the icon on the left straight into the list.";
 "Or drag the icon on the left straight into Settings." = "Or drag the icon on the left straight into Settings.";
 
@@ -391,9 +377,7 @@
 "Other" = "Other";
 "Couldn't move some items to the Trash" = "Couldn't move some items to the Trash";
 
-/* FDA relaunch detection */
 "Access granted — relaunch to apply" = "Access granted — relaunch to apply";
-"macOS applies Full Disk Access when MClean starts again. Relaunch to finish — takes a second." = "macOS applies Full Disk Access when MClean starts again. Relaunch to finish — takes a second.";
 "Relaunch MClean" = "Relaunch MClean";
 
 /* Donate (About) */

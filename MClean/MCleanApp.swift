@@ -31,9 +31,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 name: .mCleanMenuBarMonitorChanged, object: nil
             )
         }
-        // Touch TCC-protected paths so macOS registers MClean in the
-        // Full Disk Access pane on first launch (fixes issue #75).
-        FullDiskAccessManager.shared.triggerRegistration()
         // Register the Finder Services provider so "Uninstall with MClean"
         // appears when an .app bundle is right-clicked (issue #109).
         NSApp.servicesProvider = self
@@ -108,7 +105,7 @@ struct MCleanApp: App {
                 if onboardingComplete {
                     MainWindow()
                         .environmentObject(appState)
-                        .frame(minWidth: 900, minHeight: 600)
+                        .frame(width: 1000, height: 680)
                 } else {
                     OnboardingView(isComplete: $onboardingComplete)
                 }
@@ -122,7 +119,7 @@ struct MCleanApp: App {
         }
         .windowStyle(.automatic)
         .windowToolbarStyle(.unified)
-        .windowResizability(.contentMinSize)
+        .windowResizability(.contentSize)
         .defaultSize(width: 1000, height: 680)
         .commands {
             CommandGroup(replacing: .newItem) {}

@@ -11,7 +11,7 @@ enum ScanError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .permissionDenied(let path):
-            return "Permission denied when accessing '\(path)'. Grant Full Disk Access in System Settings."
+            return "Permission denied when accessing '\(path)'. Choose an accessible folder and try again."
         case .directoryEnumerationFailed(let path, let underlying):
             return "Failed to enumerate directory '\(path)': \(underlying.localizedDescription)"
         case .processExecutionFailed(let tool, let underlying):

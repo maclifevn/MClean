@@ -3,7 +3,7 @@ import SwiftUI
 struct MainWindow: View {
     @EnvironmentObject var appState: AppState
     @EnvironmentObject var theme: ThemeManager
-    @ObservedObject private var permission = PermissionCoordinator.shared
+    @ObservedObject private var sandboxAccess = SandboxAccessManager.shared
     @State private var selectedSection: AppSection? = .cleaning(.smartScan)
     @State private var columnVisibility: NavigationSplitViewVisibility = .all
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -23,10 +23,6 @@ struct MainWindow: View {
                 appearancePicker
             }
         }
-        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
-            appState.checkFullDiskAccess()
-            permission.refreshStatus()
-        }
         .onReceive(NotificationCenter.default.publisher(for: .mCleanSmartScanRequested)) { _ in
             consumeMenuBarSmartScanRequest()
         }
@@ -38,6 +34,11 @@ struct MainWindow: View {
             appState.pendingExternalApp = nil
         }
         .onAppear {
+            if NSClassFromString("XCTestCase") == nil {
+                DispatchQueue.main.async {
+                    sandboxAccess.requestFullScanAccessOnLaunch()
+                }
+            }
             // Covers a request that landed before MainWindow mounted (cold
             // launch, or while onboarding was still showing) — onChange alone
             // fires only on subsequent changes and would miss it.
@@ -47,32 +48,13 @@ struct MainWindow: View {
             }
             consumeMenuBarSmartScanRequest()
         }
-        .onChange(of: appState.cleanErrorIsFDAFixable) { isFDAFixable in
-            // Auto-route FDA-fixable clean errors straight into the rich
-            // sheet — skip the generic alert entirely so the user gets
-            // 1-tap remediation instead of "Check the log for details".
-            guard isFDAFixable else { return }
-            let pending = appState.pendingPermissionRetryItems
-            appState.cleanError = nil
-            appState.cleanErrorIsFDAFixable = false
-            appState.requestFullDiskAccessAndRetry(
-                items: pending,
-                context: .cleanup(failedCount: pending.count)
-            )
-        }
         .alert("Couldn't clean everything", isPresented: Binding(
-            get: { appState.cleanError != nil && !appState.cleanErrorIsFDAFixable },
+            get: { appState.cleanError != nil },
             set: { if !$0 { appState.cleanError = nil } }
         )) {
             Button("OK", role: .cancel) { appState.cleanError = nil }
         } message: {
             Text(appState.cleanError ?? "")
-        }
-        .sheet(isPresented: Binding(
-            get: { permission.isRequesting },
-            set: { if !$0 { permission.dismiss(callRetry: false) } }
-        )) {
-            PermissionSheet()
         }
     }
 
@@ -80,6 +62,7 @@ struct MainWindow: View {
         guard MenuBarQuickActionBuffer.smartScanRequested else { return }
         MenuBarQuickActionBuffer.smartScanRequested = false
         selectedSection = .cleaning(.smartScan)
+        guard sandboxAccess.hasFullScanAccess || sandboxAccess.requestFullScanAccess() else { return }
         appState.startSmartScan()
     }
 
@@ -148,12 +131,12 @@ struct MainWindow: View {
     }
 
     private var healthFooter: some View {
-        let ok = appState.hasFullDiskAccess
+        let ok = sandboxAccess.hasFullScanAccess
         let tint = ok ? Tint.green : Tint.orange
         return HStack(spacing: 10) {
             PulsingDot(tint: tint, isPulsing: !ok)
 
-            Text(LocalizedStringKey(ok ? "Ready to clean" : "Limited access"))
+            Text(ok ? "Full scan ready" : "Allow full scan")
                 .font(.system(size: 11.5, weight: .semibold))
                 .foregroundStyle(colorScheme == .dark
                     ? Color.white.opacity(0.92)
@@ -163,16 +146,14 @@ struct MainWindow: View {
             Spacer(minLength: 4)
             if !ok {
                 Button("Fix") {
-                    permission.requestAccess(context: .general) {
-                        appState.checkFullDiskAccess()
-                    }
+                    _ = sandboxAccess.requestFullScanAccess()
                 }
                 .buttonStyle(.bordered)
                 .controlSize(.small)
                 .help("Fix permission")
             }
         }
-        .help(LocalizedStringKey(ok ? "Full Disk Access granted" : "Grant FDA in Settings"))
+        .help(ok ? "All original scan locations are available" : "Select the startup disk in the macOS file picker")
         .padding(.horizontal, 12)
         .padding(.vertical, 8)
         .background(.bar)
@@ -192,16 +173,6 @@ struct MainWindow: View {
     @ViewBuilder
     private var detailContainer: some View {
         VStack(spacing: 0) {
-            if !appState.hasFullDiskAccess && !appState.fdaBannerDismissed {
-                fdaToast
-                    .padding(.horizontal, 16)
-                    .padding(.top, 12)
-                    .transition(
-                        reduceMotion
-                            ? .opacity
-                            : .move(edge: .top).combined(with: .opacity)
-                    )
-            }
             detailView
                 .id(selectedSection)
                 .transition(
@@ -214,10 +185,6 @@ struct MainWindow: View {
                 )
         }
         .animation(reduceMotion ? nil : .easeOut(duration: 0.22), value: selectedSection)
-        .animation(reduceMotion ? nil : .spring(response: 0.4, dampingFraction: 0.8),
-                   value: appState.fdaBannerDismissed)
-        .animation(reduceMotion ? nil : .spring(response: 0.4, dampingFraction: 0.8),
-                   value: appState.hasFullDiskAccess)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(
             // Quiet ambient gradient under every section. Static layers,
@@ -258,69 +225,6 @@ struct MainWindow: View {
         }
     }
 
-    @ViewBuilder
-    private var pulsingLockIcon: some View {
-        pulsingLockIconView()
-    }
-
-    // Quiet FDA bar — single tinted surface, no gradient or glow.
-    private var fdaToast: some View {
-        HStack(spacing: 12) {
-            IconTile(systemName: "lock.shield.fill", tint: Tint.orange, size: 32, corner: 8)
-
-            VStack(alignment: .leading, spacing: 1) {
-                Text("Full Disk Access required")
-                    .font(.system(size: 13, weight: .semibold))
-                Text("1-tap setup. We'll auto-retry what failed.")
-                    .font(.system(size: 11.5))
-                    .foregroundStyle(.secondary)
-            }
-
-            Spacer()
-
-            Button("Set up") {
-                permission.requestAccess(context: .general) {
-                    appState.checkFullDiskAccess()
-                }
-            }
-            .buttonStyle(.borderedProminent)
-            .controlSize(.regular)
-
-            Button {
-                appState.fdaBannerDismissed = true
-            } label: {
-                Image(systemName: "xmark")
-                    .font(.system(size: 10, weight: .semibold))
-                    .foregroundStyle(.secondary)
-                    .padding(6)
-                    .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-            .help("Dismiss")
-        }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 10)
-        .background(
-            RoundedRectangle(cornerRadius: 10, style: .continuous)
-                .fill(Tint.orange.opacity(0.08))
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 10, style: .continuous)
-                .strokeBorder(Tint.orange.opacity(0.22), lineWidth: 0.5)
-        )
-    }
-}
-
-@ViewBuilder
-private func pulsingLockIconView() -> some View {
-    let base = Image(systemName: "lock.shield.fill")
-        .font(.system(size: 18, weight: .semibold))
-        .foregroundStyle(.white)
-    if #available(macOS 14.0, *) {
-        base.symbolEffect(.pulse.byLayer, options: .repeating)
-    } else {
-        base
-    }
 }
 
 /// Space Lens sidebar row. Observes the view model directly so the badge
@@ -427,8 +331,6 @@ private struct PulsingDot: View {
         }
         .frame(width: 18, height: 18)
         .onAppear { syncPulse() }
-        // The FDA status can flip while the window stays open — onAppear
-        // alone latches the first value and never starts/stops the loop.
         .onChange(of: isPulsing) { _ in syncPulse() }
     }
 

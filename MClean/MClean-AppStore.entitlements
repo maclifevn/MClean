@@ -2,11 +2,8 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-	<!-- Mac App Store builds must be sandboxed. Scanning outside the
-	     container goes through NSOpenPanel grants persisted as
-	     security-scoped bookmarks; there is no privilege escalation and
-	     no Full Disk Access flow in this variant (see the APPSTORE
-	     compilation condition). -->
+	<!-- Filesystem access comes only from native file-picker grants persisted
+	     as app-scoped security bookmarks. -->
 	<key>com.apple.security.app-sandbox</key>
 	<true/>
 	<key>com.apple.security.files.user-selected.read-write</key>

@@ -11,6 +11,7 @@ import Combine
 final class WindowOpener {
     static let shared = WindowOpener()
     var open: ((String) -> Void)?
+    var openSettings: (() -> Void)?
     private init() {}
 }
 
@@ -126,9 +127,28 @@ final class MenuBarController: NSObject, NSPopoverDelegate {
     private func openSettings() {
         closePopover()
         NSApp.activate(ignoringOtherApps: true)
-        // SwiftUI's OpenSettingsAction starts at macOS 14 while MClean still
-        // supports macOS 13. Route through the standard AppKit responder-chain
-        // action so the Settings scene works across the deployment range.
+
+        // The popover's NSHostingController is outside the SwiftUI scene tree,
+        // so its responder chain cannot reliably discover the Settings scene.
+        // Use the action captured from the main WindowGroup on macOS 14+.
+        if let openSettings = WindowOpener.shared.openSettings {
+            openSettings()
+            return
+        }
+
+        // If the main scene has never mounted (for example after restoring
+        // with every window closed), use the app's native Command-, menu item.
+        for menu in NSApp.mainMenu?.items.compactMap(\.submenu) ?? [] {
+            if let index = menu.items.firstIndex(where: {
+                $0.keyEquivalent == "," &&
+                $0.keyEquivalentModifierMask.contains(.command)
+            }) {
+                menu.performActionForItem(at: index)
+                return
+            }
+        }
+
+        // macOS 13 fallback, where OpenSettingsAction is unavailable.
         let opened = NSApp.sendAction(
             Selector(("showSettingsWindow:")), to: nil, from: nil
         )

@@ -8,9 +8,30 @@ struct WindowOpenerCapture: View {
     @Environment(\.openWindow) private var openWindow
 
     var body: some View {
+        ZStack {
+            Color.clear
+                .frame(width: 0, height: 0)
+                .onAppear { WindowOpener.shared.open = { id in openWindow(id: id) } }
+
+            if #available(macOS 14.0, *) {
+                SettingsOpenerCapture()
+            }
+        }
+    }
+}
+
+/// Captures `OpenSettingsAction` from a real SwiftUI scene. The menu-bar
+/// popover itself is hosted by AppKit and does not inherit this environment.
+@available(macOS 14.0, *)
+private struct SettingsOpenerCapture: View {
+    @Environment(\.openSettings) private var openSettings
+
+    var body: some View {
         Color.clear
             .frame(width: 0, height: 0)
-            .onAppear { WindowOpener.shared.open = { id in openWindow(id: id) } }
+            .onAppear {
+                WindowOpener.shared.openSettings = { openSettings() }
+            }
     }
 }
 

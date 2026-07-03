@@ -8,15 +8,11 @@
 "MClean" = "MClean";
 "Ready to clean" = "クリーンアップ可能";
 "Limited access" = "アクセスが制限されています";
-"Full Disk Access granted" = "フルディスクアクセスが許可されています";
-"Grant FDA in Settings" = "設定でフルディスクアクセスを許可";
 "Select a category from the sidebar to get started." = "サイドバーからカテゴリを選択して始めてください。";
 
-/* FDA toast + clean error alert (MainWindow) */
 "Couldn't clean everything" = "すべてを削除できませんでした";
 "Open System Settings" = "システム設定を開く";
 "OK" = "OK";
-"Full Disk Access required" = "フルディスクアクセスが必要です";
 "macOS blocks MClean from cleaning caches and uninstalling apps until you grant access." = "アクセスを許可するまで、macOSはMCleanによるキャッシュの削除やアプリのアンインストールをブロックします。";
 "Grant Access" = "アクセスを許可";
 
@@ -42,7 +38,6 @@
 "Found so far" = "これまでに見つかったもの";
 "By category" = "カテゴリ別";
 "%@ is using %@" = "%@ は %@ を使用しています";
-"Grant Full Disk Access for full results" = "完全な結果を得るためにフルディスクアクセスを許可してください";
 "Without it, most caches and uninstall flows fail." = "許可しないと、ほとんどのキャッシュ削除やアンインストールに失敗します。";
 "Action" = "アクション";
 "Scanning your Mac" = "Macをスキャン中";
@@ -132,11 +127,8 @@
 "Remove apps and all their files" = "アプリと関連ファイルをすべて削除";
 "Orphan Finder" = "孤立ファイル検出";
 "Find leftovers from deleted apps" = "削除済みアプリの残存物を検出";
-"Full Disk Access" = "フルディスクアクセス";
-"MClean needs Full Disk Access to uninstall apps, find leftover files, and clean protected caches." = "アプリのアンインストール、残存ファイルの検出、保護されたキャッシュのクリーンアップにはフルディスクアクセスが必要です。";
 "We'll guide you through the next steps." = "次のステップへご案内します。";
 "In System Settings, do this:" = "システム設定で次の操作を行ってください:";
-"Privacy & Security → Full Disk Access" = "プライバシーとセキュリティ → フルディスクアクセス";
 "Find **MClean** and turn the toggle on" = "**MClean** を見つけてスイッチをオンにする";
 "Authenticate with Touch ID or your password" = "Touch IDまたはパスワードで認証";
 "Reopen Settings" = "設定を再度開く";
@@ -150,7 +142,6 @@
 "MClean can now manage protected files." = "MCleanは保護されたファイルを管理できるようになりました。";
 "You're Ready" = "準備完了";
 "%lld/%lld protected locations accessible" = "%lld/%lld の保護された場所にアクセス可能";
-"Some features will be limited. You can grant Full Disk Access later in System Settings." = "一部の機能は制限されます。フルディスクアクセスは後でシステム設定から許可できます。";
 "Trash" = "ゴミ箱";
 "Mail Data" = "メールデータ";
 "Safari Data" = "Safariデータ";
@@ -261,10 +252,6 @@
 "Found %@ of junk files." = "%@ のジャンクファイルが見つかりました。";
 
 /* Permission Sheet */
-"Grant Full Disk Access" = "フルディスクアクセスを付与";
-"%lld item(s) need Full Disk Access" = "%lld 件にフルディスクアクセスが必要です";
-"Uninstalling %@: %lld file(s) need Full Disk Access" = "%@ のアンインストール: %lld 個のファイルにフルディスクアクセスが必要です";
-"%lld item(s) need Full Disk Access to remove. Tap Grant Access to fix in one step." = "%lld 件の削除にはフルディスクアクセスが必要です。「アクセスを許可」をタップすると一手で解決します。";
 "Couldn't remove %@%@. They may be in use or protected by macOS." = "%@%@ を削除できませんでした。使用中か macOS によって保護されている可能性があります。";
 " and %lld more" = " 他 %lld 件";
 "Access granted. Retrying…" = "アクセスが許可されました。再試行中…";
@@ -324,7 +311,6 @@
 
 /* Drag handle */
 "Drag to the Settings list" = "設定のリストにドラッグ";
-"Drag this icon into the Full Disk Access list in System Settings." = "このアイコンをシステム設定のフルディスクアクセスのリストにドラッグしてください。";
 "Tip: drag the icon on the left straight into the list." = "ヒント: 左のアイコンをそのままリストにドラッグできます。";
 "Or drag the icon on the left straight into Settings." = "または左のアイコンをそのまま設定にドラッグしてください。";
 
@@ -391,9 +377,7 @@
 "Other" = "その他";
 "Couldn't move some items to the Trash" = "一部の項目をゴミ箱に移動できませんでした";
 
-/* FDA relaunch detection */
 "Access granted — relaunch to apply" = "アクセスが許可されました — 再起動で適用されます";
-"macOS applies Full Disk Access when MClean starts again. Relaunch to finish — takes a second." = "macOS はフルディスクアクセスを MClean の再起動後に適用します。再起動して完了してください — 一瞬で終わります。";
 "Relaunch MClean" = "MClean を再起動";
 
 /* Donate (About) */

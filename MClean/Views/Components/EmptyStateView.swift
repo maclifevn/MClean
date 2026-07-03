@@ -50,7 +50,7 @@ struct EmptyStateView: View {
             }
 
             Text(title)
-                .font(.title3.bold())
+                .font(.title3.weight(.semibold))
                 .staggered(0, baseDelay: 0.08)
             Text(description)
                 .font(.callout)

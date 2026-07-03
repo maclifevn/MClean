@@ -16,6 +16,7 @@ struct DashboardView: View {
     @State private var burstOrigin: UnitPoint = UnitPoint(x: 0.25, y: 0.28)
     @State private var dashboardSize: CGSize = .zero
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @ObservedObject private var sandboxAccess = SandboxAccessManager.shared
 
     private let dashboardSpace = "dashboard"
 
@@ -191,12 +192,15 @@ struct DashboardView: View {
                         }
                         Spacer()
                         Button {
-                            appState.startSmartScan()
+                            startSmartScan()
                         } label: {
                             Label("Smart Scan", systemImage: "sparkles")
-                                .padding(.horizontal, 4)
+                                .lineLimit(1)
+                                .fixedSize(horizontal: true, vertical: false)
+                                .padding(.horizontal, 6)
                         }
                         .buttonStyle(GlowProminentButtonStyle(breathes: true))
+                        .layoutPriority(1)
                     }
 
                     storageBreakdown(used: used, total: total)
@@ -277,7 +281,7 @@ struct DashboardView: View {
                 tint: Tint.blue,
                 label: "Free Space",
                 value: ByteCountFormatter.string(fromByteCount: free, countStyle: .file),
-                delta: total > 0 ? freeSpaceDelta(total: total, percentUsed: percentUsed) : nil,
+                delta: total > 0 ? percentUsedText(percentUsed) : nil,
                 byteValue: free
             )
             .staggered(0)
@@ -314,14 +318,6 @@ struct DashboardView: View {
             )
             .staggered(3)
         }
-    }
-
-    private func freeSpaceDelta(total: Int64, percentUsed: Double) -> String {
-        String(
-            format: String(localized: "of %@ · %lld%% used"),
-            ByteCountFormatter.string(fromByteCount: total, countStyle: .file),
-            Int64(percentUsed * 100)
-        )
     }
 
     private func junkFoundDelta(count: Int) -> String {
@@ -413,13 +409,13 @@ struct DashboardView: View {
                 pill: biggest.formattedSize
             ))
         }
-        if !appState.hasFullDiskAccess {
+        if !sandboxAccess.hasFullScanAccess {
             out.append(Suggestion(
-                icon: "lock.shield.fill",
-                tint: Tint.orange,
-                title: String(localized: "Grant Full Disk Access for full results"),
-                subtitle: String(localized: "Without it, most caches and uninstall flows fail."),
-                pill: String(localized: "Action")
+                icon: "folder.badge.plus",
+                tint: Tint.blue,
+                title: "Allow full scan access",
+                subtitle: "Select the startup disk once to retain every original scan category.",
+                pill: "Action"
             ))
         }
         return out
@@ -489,7 +485,7 @@ struct DashboardView: View {
                         }
                     }
                     Spacer()
-                    Button("Scan Again") { appState.startSmartScan() }
+                    Button("Scan Again") { startSmartScan() }
                         .controlSize(.large)
                 }
                 if !isClean {
@@ -519,6 +515,11 @@ struct DashboardView: View {
             format: String(localized: "Clean %@"),
             ByteCountFormatter.string(fromByteCount: appState.totalSelectedSize, countStyle: .file)
         )
+    }
+
+    private func startSmartScan() {
+        guard sandboxAccess.hasFullScanAccess || sandboxAccess.requestFullScanAccess() else { return }
+        appState.startSmartScan()
     }
 
     private var categoryChartCard: some View {
@@ -606,7 +607,7 @@ struct DashboardView: View {
 
     private func sectionHeader(_ text: LocalizedStringKey) -> some View {
         Text(text)
-            .font(.system(size: 16, weight: .bold))
+            .font(.headline)
             .padding(.top, 4)
     }
 }
@@ -626,14 +627,16 @@ private struct StatCard: View {
     var body: some View {
         CardSurface(padding: 14, accent: tint) {
             VStack(alignment: .leading, spacing: 6) {
-                HStack(spacing: 8) {
-                    IconTile(systemName: icon, tint: tint, size: 28, glow: true)
+                HStack(alignment: .top, spacing: 8) {
+                    IconTile(systemName: icon, tint: tint, size: 26)
                     Text(label)
-                        .font(.system(size: 12, weight: .medium))
+                        .font(.subheadline.weight(.medium))
                         .foregroundStyle(.secondary)
-                        .textCase(.uppercase)
-                        .tracking(0.4)
+                        .lineLimit(2)
+                        .frame(maxWidth: .infinity, alignment: .leading)
                 }
+                .frame(height: 30, alignment: .top)
+
                 Group {
                     if let byteValue {
                         CountUpBytes(bytes: byteValue)
@@ -643,16 +646,20 @@ private struct StatCard: View {
                             .contentTransition(.numericText())
                     }
                 }
-                .font(.system(size: 22, weight: .bold))
+                .font(.title2.weight(.semibold))
                 .lineLimit(1)
-                .minimumScaleFactor(0.6)
-                if let delta {
-                    Text(delta)
-                        .font(.system(size: 11))
-                        .foregroundStyle(.tertiary)
-                }
+                .minimumScaleFactor(0.75)
+
+                Text(delta ?? " ")
+                    .font(.caption)
+                    .foregroundStyle(.tertiary)
+                    .lineLimit(1)
+                    .opacity(delta == nil ? 0 : 1)
             }
+            .frame(maxWidth: .infinity, minHeight: 82, maxHeight: 82,
+                   alignment: .topLeading)
         }
+        .frame(maxWidth: .infinity)
         .pressable(hoverScale: 1.02, lift: true)
     }
 }

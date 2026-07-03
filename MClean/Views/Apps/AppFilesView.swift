@@ -107,35 +107,16 @@ struct AppFilesView: View {
         }
         .onAppear { rebuildSizeCache() }
         .onChange(of: appState.discoveredFiles) { _ in rebuildSizeCache() }
-        .onChange(of: appState.removalNeedsFullDiskAccess) { needs in
-            // FDA-fixable removals jump straight into the rich sheet, the
-            // same flow cleanup uses. The user grants permission once and we
-            // re-fire the failed batch — using the frozen snapshot from
-            // AppState so a mid-sheet selection change or app switch doesn't
-            // re-trash the wrong files.
-            guard needs else { return }
-            let toRetry = appState.lastFailedRemovalURLs
-            let items = toRetry.map { appState.makeUninstallCleanableItem(for: $0) }
-            appState.removalError = nil
-            appState.removalNeedsFullDiskAccess = false
-            appState.lastFailedRemovalURLs = []
-            appState.requestFullDiskAccessAndRetry(
-                items: items,
-                context: .uninstall(appName: app.appName, failedCount: items.count)
-            )
-        }
         .alert("Removal Failed", isPresented: Binding(
-            get: { appState.removalError != nil && !appState.removalNeedsFullDiskAccess },
+            get: { appState.removalError != nil },
             set: {
                 if !$0 {
                     appState.removalError = nil
-                    appState.removalNeedsFullDiskAccess = false
                 }
             }
         )) {
             Button("OK", role: .cancel) {
                 appState.removalError = nil
-                appState.removalNeedsFullDiskAccess = false
             }
         } message: {
             Text(appState.removalError ?? "")
@@ -155,7 +136,7 @@ struct AppFilesView: View {
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(app.appName)
-                    .font(.title3.bold())
+                    .font(.title3.weight(.semibold))
                 Text(app.bundleIdentifier)
                     .font(.caption)
                     .foregroundStyle(.secondary)
@@ -171,7 +152,7 @@ struct AppFilesView: View {
                         .monospacedDigit()
                         .contentTransition(.numericText())
                     CountUpBytes(bytes: totalSelectedSize)
-                        .font(.callout.bold())
+                        .font(.callout.weight(.semibold))
                 }
                 .animation(reduceMotion ? nil : .spring(response: 0.4, dampingFraction: 0.9),
                            value: appState.discoveredFiles.count)

@@ -45,6 +45,7 @@ struct GeneralSettingsView: View {
     @AppStorage(AppLanguage.preferenceKey) private var appLanguageRaw = AppLanguage.current.rawValue
     @State private var languageNeedsRelaunch = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @ObservedObject private var sandboxAccess = SandboxAccessManager.shared
 
     var body: some View {
         Form {
@@ -92,6 +93,33 @@ struct GeneralSettingsView: View {
                 Text("Live CPU, memory, and disk meters in the menu bar. MClean keeps running in the background while this is on.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
+            }
+
+            Section("Folder Access") {
+                if !sandboxAccess.hasFullScanAccess {
+                    Text("Select the startup disk to preserve the original Smart Scan coverage. macOS asks you to confirm it in the native file picker.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                } else {
+                    Label("All original scan locations are available", systemImage: "checkmark.shield.fill")
+                        .foregroundStyle(Tint.green)
+                    ForEach(sandboxAccess.authorizedURLs, id: \.path) { url in
+                        Text(url.path)
+                            .lineLimit(1)
+                            .truncationMode(.middle)
+                            .help(url.path)
+                    }
+                }
+                HStack {
+                    if !sandboxAccess.hasFullScanAccess {
+                        Button("Allow Full Scan…") { _ = sandboxAccess.requestFullScanAccess() }
+                            .buttonStyle(.borderedProminent)
+                    }
+                    Button("Add Folder…") { _ = sandboxAccess.chooseFolders() }
+                    if sandboxAccess.hasAuthorizedFolders {
+                        Button("Revoke Access", role: .destructive) { sandboxAccess.revokeAll() }
+                    }
+                }
             }
 
             Section("Sound") {
@@ -333,7 +361,7 @@ struct AboutSettingsView: View {
                     MCleanAppIcon(size: 64, shadow: true)
                     VStack(alignment: .leading, spacing: 4) {
                         Text("MClean")
-                            .font(.title2.bold())
+                            .font(.title2.weight(.semibold))
                         Text(
                             String(
                                 format: String(localized: "Version %@"),
@@ -369,7 +397,7 @@ struct AboutSettingsView: View {
                         )
                     VStack(alignment: .leading, spacing: 6) {
                         Text("Buy me a coffee ☕")
-                            .font(.system(size: 14, weight: .bold))
+                            .font(.headline)
                         Text("If MClean is useful to you, a small donation keeps it going. Thank you!")
                             .font(.caption)
                             .foregroundStyle(.secondary)
