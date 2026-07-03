@@ -1,9 +1,8 @@
 name: Release
 
+# Manual-only until Developer ID + notarization secrets are configured —
+# a tag-push trigger would fail at the signing step and mark releases red.
 on:
-  push:
-    tags:
-      - 'v*.*.*'
   workflow_dispatch:
     inputs:
       version:
@@ -22,7 +21,7 @@ permissions:
 env:
   APP_NAME: MClean
   BUNDLE_ID: com.maclife.mclean
-  TEAM_ID: H3WXHVTP97
+  TEAM_ID: CF5PGH3KGK
   SCHEME: MClean
   PROJECT: MClean.xcodeproj
   CONFIGURATION: Release
