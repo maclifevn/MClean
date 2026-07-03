@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://maclifevn.github.io/MClean/sitemap.xml

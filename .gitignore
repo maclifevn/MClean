@@ -1,0 +1,54 @@
+# Xcode
+build/
+build-ci/
+DerivedData/
+*.xcworkspace
+!*.xcworkspace/contents.xcworkspacedata
+*.xcuserdata
+xcuserdata/
+
+# macOS
+.DS_Store
+*.swp
+*~
+
+# Swift Package Manager
+.build/
+Packages/
+Package.resolved
+
+# CocoaPods
+Pods/
+
+# Carthage
+Carthage/Build/
+
+# IDE
+*.pbxuser
+*.mode1v3
+*.mode2v3
+*.perspectivev3
+*.moved-aside
+
+# Fastlane (entire directory)
+fastlane/
+
+# Credentials
+*.p8
+*.p12
+*.cer
+*.mobileprovision
+fastlane/README.md
+asc_api.py
+ExportOptions.plist
+
+# Build artifacts
+*.dmg
+*.zip
+build/
+
+# Work files (local only)
+_work/
+
+# Local handoff notes (never committed)
+HANDOFF.md

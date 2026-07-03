@@ -1,0 +1,401 @@
+/* Sidebar (MainWindow) */
+"Overview" = "Overview";
+"Applications" = "Applications";
+"Cleanup" = "Cleanup";
+"Dashboard" = "Dashboard";
+"Installed Apps" = "Installed Apps";
+"Orphaned Files" = "Orphaned Files";
+"MClean" = "MClean";
+"Ready to clean" = "Ready to clean";
+"Limited access" = "Limited access";
+"Full Disk Access granted" = "Full Disk Access granted";
+"Grant FDA in Settings" = "Grant FDA in Settings";
+"Select a category from the sidebar to get started." = "Select a category from the sidebar to get started.";
+
+/* FDA toast + clean error alert (MainWindow) */
+"Couldn't clean everything" = "Couldn't clean everything";
+"Open System Settings" = "Open System Settings";
+"OK" = "OK";
+"Full Disk Access required" = "Full Disk Access required";
+"macOS blocks MClean from cleaning caches and uninstalling apps until you grant access." = "macOS blocks MClean from cleaning caches and uninstalling apps until you grant access.";
+"Grant Access" = "Grant Access";
+
+/* Permission Sheet */
+"Grant Full Disk Access" = "Grant Full Disk Access";
+"%lld item(s) need Full Disk Access" = "%lld item(s) need Full Disk Access";
+"Uninstalling %@: %lld file(s) need Full Disk Access" = "Uninstalling %@: %lld file(s) need Full Disk Access";
+"%lld item(s) need Full Disk Access to remove. Tap Grant Access to fix in one step." = "%lld item(s) need Full Disk Access to remove. Tap Grant Access to fix in one step.";
+"Couldn't remove %@%@. They may be in use or protected by macOS." = "Couldn't remove %@%@. They may be in use or protected by macOS.";
+" and %lld more" = " and %lld more";
+"Access granted. Retrying…" = "Access granted. Retrying…";
+"1-tap setup. We'll detect the change automatically." = "1-tap setup. We'll detect the change automatically.";
+"Open Settings & reveal MClean" = "Open Settings & reveal MClean";
+"We'll open both windows side-by-side." = "We'll open both windows side-by-side.";
+"Turn on MClean" = "Turn on MClean";
+"Toggle the row that appears." = "Toggle the row that appears.";
+"Authenticate" = "Authenticate";
+"Touch ID or password." = "Touch ID or password.";
+"We auto-retry — no need to come back." = "We auto-retry — no need to come back.";
+"Watching for permission change…" = "Watching for permission change…";
+"MClean not in the list?" = "MClean not in the list?";
+"Hide help" = "Hide help";
+"Try this if MClean doesn't appear:" = "Try this if MClean doesn't appear:";
+"Reveal app" = "Reveal app";
+"Drag MClean.app into the list" = "Drag MClean.app into the list";
+"Reset + reprompt" = "Reset + reprompt";
+"Clear stale TCC entry" = "Clear stale TCC entry";
+"+ %lld more" = "+ %lld more";
+"%lld blocked path(s)" = "%lld blocked path(s)";
+"Access granted" = "Access granted";
+"Retrying the operation now." = "Retrying the operation now.";
+"Skip for now" = "Skip for now";
+"I granted it — retry" = "I granted it — retry";
+
+/* Dashboard polish */
+"Low space" = "Low space";
+"CLEANING" = "CLEANING";
+"Quick Setup" = "Quick Setup";
+"1-tap setup. We'll auto-retry what failed." = "1-tap setup. We'll auto-retry what failed.";
+"Fix permission" = "Fix permission";
+"Dismiss" = "Dismiss";
+
+/* Dashboard */
+"Storage" = "Storage";
+"Smart Scan" = "Smart Scan";
+"free of %@" = "free of %@";
+"%lld%% used" = "%lld%% used";
+"Used" = "Used";
+"Junk" = "Junk";
+"Purgeable" = "Purgeable";
+"USED" = "USED";
+"SCANNING" = "SCANNING";
+"Free Space" = "Free Space";
+"Junk Found" = "Junk Found";
+"Apps" = "Apps";
+"of %@ · %lld%% used" = "of %@ · %lld%% used";
+"Run a scan" = "Run a scan";
+"across %lld categories" = "across %lld categories";
+"installed" = "installed";
+"APFS reclaimable" = "APFS reclaimable";
+"Suggested for you" = "Suggested for you";
+"Found so far" = "Found so far";
+"By category" = "By category";
+"%@ is using %@" = "%@ is using %@";
+"Grant Full Disk Access for full results" = "Grant Full Disk Access for full results";
+"Without it, most caches and uninstall flows fail." = "Without it, most caches and uninstall flows fail.";
+"Action" = "Action";
+"Scanning your Mac" = "Scanning your Mac";
+"Currently in: %@" = "Currently in: %@";
+"found" = "found";
+"Your Mac is clean" = "Your Mac is clean";
+"Scan Again" = "Scan Again";
+"Clean %@" = "Clean %@";
+"Clean %@?" = "Clean %@?";
+"Cleaning…" = "Cleaning…";
+"%lld%% complete" = "%lld%% complete";
+"freed" = "freed";
+"Done" = "Done";
+"%lld items" = "%lld items";
+
+/* Common destructive dialog */
+"Clean" = "Clean";
+"Cancel" = "Cancel";
+"This will permanently delete the selected files. This cannot be undone." = "This will permanently delete the selected files. This cannot be undone.";
+
+/* Category Detail */
+"All Clean" = "All Clean";
+"No junk files found in this category." = "No junk files found in this category.";
+"Not Scanned" = "Not Scanned";
+"Run a scan to analyze this category." = "Run a scan to analyze this category.";
+"Scan Now" = "Scan Now";
+"Filter files" = "Filter files";
+"Scan" = "Scan";
+"Select All" = "Select All";
+"Deselect All" = "Deselect All";
+"Largest First" = "Largest First";
+"Smallest First" = "Smallest First";
+"Sorted: Largest First" = "Sorted: Largest First";
+"Sorted: Smallest First" = "Sorted: Smallest First";
+"Clean %lld items" = "Clean %lld items";
+"%lld items · %@" = "%lld items · %@";
+"Scanning…" = "Scanning…";
+"Rescan" = "Rescan";
+"%lld of %lld selected" = "%lld of %lld selected";
+"Reveal in Finder" = "Reveal in Finder";
+"Copy Path" = "Copy Path";
+"Move to Trash" = "Move to Trash";
+
+/* Apps (AppListView) */
+"Search apps" = "Search apps";
+"Refresh" = "Refresh";
+"Installed Apps (%lld)" = "Installed Apps (%lld)";
+"Loading installed apps..." = "Loading installed apps...";
+"No Apps Found" = "No Apps Found";
+"Could not find any installed applications." = "Could not find any installed applications.";
+"Retry" = "Retry";
+"Application" = "Application";
+"Size" = "Size";
+"Select an App" = "Select an App";
+"Select an app from the list to see all its related files across your system." = "Select an app from the list to see all its related files across your system.";
+
+/* App Files (AppFilesView) */
+"%lld files" = "%lld files";
+"Scanning for related files..." = "Scanning for related files...";
+"Checking %lld locations..." = "Checking %lld locations...";
+"No Related Files" = "No Related Files";
+"No additional files found for %@." = "No additional files found for %@.";
+"Remove %lld files (%@)" = "Remove %lld files (%@)";
+"Removal Failed" = "Removal Failed";
+"Remove this file" = "Remove this file";
+"Remove %@?" = "Remove %@?";
+"Remove" = "Remove";
+"This will permanently delete this file. This action cannot be undone." = "This will permanently delete this file. This action cannot be undone.";
+
+/* Orphans */
+"Scanning for orphaned files..." = "Scanning for orphaned files...";
+"No Orphaned Files" = "No Orphaned Files";
+"No leftover files from uninstalled apps were found." = "No leftover files from uninstalled apps were found.";
+"Scan for Orphans" = "Scan for Orphans";
+"Orphaned Files (%lld)" = "Orphaned Files (%lld)";
+"Remove Selected (%lld)" = "Remove Selected (%lld)";
+"Some files could not be removed" = "Some files could not be removed";
+
+/* Onboarding */
+"Back" = "Back";
+"Next" = "Next";
+"Get Started" = "Get Started";
+"Welcome to MClean" = "Welcome to MClean";
+"Free, open-source macOS app manager and system cleaner." = "Free, open-source macOS app manager and system cleaner.";
+"Find junk files across your system" = "Find junk files across your system";
+"App Uninstaller" = "App Uninstaller";
+"Remove apps and all their files" = "Remove apps and all their files";
+"Orphan Finder" = "Orphan Finder";
+"Find leftovers from deleted apps" = "Find leftovers from deleted apps";
+"Full Disk Access" = "Full Disk Access";
+"MClean needs Full Disk Access to uninstall apps, find leftover files, and clean protected caches." = "MClean needs Full Disk Access to uninstall apps, find leftover files, and clean protected caches.";
+"We'll guide you through the next steps." = "We'll guide you through the next steps.";
+"In System Settings, do this:" = "In System Settings, do this:";
+"Privacy & Security → Full Disk Access" = "Privacy & Security → Full Disk Access";
+"Find **MClean** and turn the toggle on" = "Find **MClean** and turn the toggle on";
+"Authenticate with Touch ID or your password" = "Authenticate with Touch ID or your password";
+"Reopen Settings" = "Reopen Settings";
+"MClean isn't in the list — reveal it" = "MClean isn't in the list — reveal it";
+"Reset permissions and re-prompt" = "Reset permissions and re-prompt";
+"Hide diagnostics" = "Hide diagnostics";
+"Show diagnostics" = "Show diagnostics";
+"Trouble?" = "Trouble?";
+"Waiting for permission…" = "Waiting for permission…";
+"Permission granted." = "Permission granted.";
+"MClean can now manage protected files." = "MClean can now manage protected files.";
+"You're Ready" = "You're Ready";
+"%lld/%lld protected locations accessible" = "%lld/%lld protected locations accessible";
+"Some features will be limited. You can grant Full Disk Access later in System Settings." = "Some features will be limited. You can grant Full Disk Access later in System Settings.";
+"Trash" = "Trash";
+"Mail Data" = "Mail Data";
+"Safari Data" = "Safari Data";
+"Desktop" = "Desktop";
+"Documents" = "Documents";
+"TCC Database" = "TCC Database";
+"Blocked" = "Blocked";
+
+/* Settings */
+"General" = "General";
+"Cleaning" = "Cleaning";
+"Schedule" = "Schedule";
+"About" = "About";
+"Startup" = "Startup";
+"Launch MClean at login" = "Launch MClean at login";
+"App Scanning" = "App Scanning";
+"Search sensitivity" = "Search sensitivity";
+"Strict" = "Strict";
+"Enhanced" = "Enhanced";
+"Deep" = "Deep";
+"Exact bundle ID and name matches only. Safest option." = "Exact bundle ID and name matches only. Safest option.";
+"Includes partial name matching and bundle ID components." = "Includes partial name matching and bundle ID components.";
+"Includes company name, entitlements, and team identifier matching." = "Includes company name, entitlements, and team identifier matching.";
+"Language" = "Language";
+"Restart MClean to apply the selected language." = "Restart MClean to apply the selected language.";
+"Relaunch Now" = "Relaunch Now";
+"System Default" = "System Default";
+"English" = "English";
+"Spanish" = "Spanish";
+"Japanese" = "Japanese";
+"Arabic" = "Arabic";
+"Portuguese (Brazil)" = "Portuguese (Brazil)";
+"Chinese (Simplified)" = "Chinese (Simplified)";
+"Chinese (Traditional)" = "Chinese (Traditional)";
+"Safety" = "Safety";
+"Confirm before deleting files" = "Confirm before deleting files";
+"File Discovery" = "File Discovery";
+"Skip hidden files during scan" = "Skip hidden files during scan";
+"Large Files" = "Large Files";
+"Minimum size: %lld MB" = "Minimum size: %lld MB";
+"Files older than: %lld months" = "Files older than: %lld months";
+"Automatic Scanning" = "Automatic Scanning";
+"Enable scheduled scanning" = "Enable scheduled scanning";
+"Scan interval" = "Scan interval";
+"Auto-clean after scan" = "Auto-clean after scan";
+"Auto-purge purgeable space" = "Auto-purge purgeable space";
+"Notify on completion" = "Notify on completion";
+"Last run" = "Last run";
+"Version %@" = "Version %@";
+"Free, open-source macOS app manager." = "Free, open-source macOS app manager.";
+"GitHub Repository" = "GitHub Repository";
+"Report an Issue" = "Report an Issue";
+"MIT License" = "MIT License";
+
+/* Cleaning categories (CleaningCategory.rawValue) */
+"System Junk" = "System Junk";
+"User Cache" = "User Cache";
+"AI Apps" = "AI Apps";
+"Mail Files" = "Mail Files";
+"Trash Bins" = "Trash Bins";
+"Large & Old Files" = "Large & Old Files";
+"Purgeable Space" = "Purgeable Space";
+"Xcode Junk" = "Xcode Junk";
+"Brew Cache" = "Brew Cache";
+"Node Cache" = "Node Cache";
+"Docker Cache" = "Docker Cache";
+
+/* Cleaning category descriptions */
+"Scan everything at once" = "Scan everything at once";
+"System caches, logs, and temporary files" = "System caches, logs, and temporary files";
+"Application caches and browser data" = "Application caches and browser data";
+"Local AI app logs, caches, and optional history" = "Local AI app logs, caches, and optional history";
+"Downloaded mail attachments" = "Downloaded mail attachments";
+"Files in your Trash" = "Files in your Trash";
+"Files over 100 MB or older than 1 year" = "Files over 100 MB or older than 1 year";
+"APFS purgeable disk space" = "APFS purgeable disk space";
+"Derived data, archives, and simulators" = "Derived data, archives, and simulators";
+"Homebrew download cache" = "Homebrew download cache";
+"npm, yarn, and pnpm download caches" = "npm, yarn, and pnpm download caches";
+"Docker images, containers, and build cache" = "Docker images, containers, and build cache";
+
+/* Node Cache subcategories */
+"npm cache" = "npm cache";
+"yarn classic cache" = "yarn classic cache";
+"pnpm content-addressable store" = "pnpm content-addressable store";
+
+/* Docker Cache helper */
+"Reclaimable (run `docker system prune -af`)" = "Reclaimable (run `docker system prune -af`)";
+
+/* Schedule intervals (ScheduleInterval.rawValue) */
+"Every Hour" = "Every Hour";
+"Every 3 Hours" = "Every 3 Hours";
+"Every 6 Hours" = "Every 6 Hours";
+"Every 12 Hours" = "Every 12 Hours";
+"Daily" = "Daily";
+"Weekly" = "Weekly";
+"Every 2 Weeks" = "Every 2 Weeks";
+"Monthly" = "Monthly";
+
+/* Schedule status */
+"Never" = "Never";
+"Not scheduled" = "Not scheduled";
+
+/* Appearance modes (AppearanceMode.label) */
+"System" = "System";
+"Light" = "Light";
+"Dark" = "Dark";
+
+/* Notifications */
+"Found %@ of junk files." = "Found %@ of junk files.";
+
+/* Onboarding v2 */
+"Reclaim your Mac" = "Reclaim your Mac";
+"Apple sells you small disks. We help you keep them clean." = "Apple sells you small disks. We help you keep them clean.";
+"Free. Open source. MIT licensed." = "Free. Open source. MIT licensed.";
+"What's inside" = "What's inside";
+"Three things, done well." = "Three things, done well.";
+"Find caches, logs, broken installs, and the AI-app history hiding in your library." = "Find caches, logs, broken installs, and the AI-app history hiding in your library.";
+"Drag an app, see every file it dropped, remove all of it. No leftovers." = "Drag an app, see every file it dropped, remove all of it. No leftovers.";
+"Surfaces files that outlived the apps that created them." = "Surfaces files that outlived the apps that created them.";
+"One permission, then we're done" = "One permission, then we're done";
+"Permission granted" = "Permission granted";
+"MClean can now reach the locations macOS protects by default." = "MClean can now reach the locations macOS protects by default.";
+"macOS hides certain folders from every app until you say otherwise. We need them to find caches and uninstall cleanly." = "macOS hides certain folders from every app until you say otherwise. We need them to find caches and uninstall cleanly.";
+"All set — moving you to the next step." = "All set — moving you to the next step.";
+"Reveal app again" = "Reveal app again";
+"Reset permissions" = "Reset permissions";
+"You're ready" = "You're ready";
+"Ready when you are" = "Ready when you are";
+"Hit Start to run your first Smart Scan." = "Hit Start to run your first Smart Scan.";
+"Skip" = "Skip";
+"Start" = "Start";
+"Continue" = "Continue";
+
+/* Drag handle */
+"Drag to the Settings list" = "Drag to the Settings list";
+"Drag this icon into the Full Disk Access list in System Settings." = "Drag this icon into the Full Disk Access list in System Settings.";
+"Tip: drag the icon on the left straight into the list." = "Tip: drag the icon on the left straight into the list.";
+"Or drag the icon on the left straight into Settings." = "Or drag the icon on the left straight into Settings.";
+
+/* Dashboard storage composition (v2.7.0) */
+"Storage composition" = "Storage composition";
+"total" = "total";
+"Free" = "Free";
+
+/* UI polish (v2.8.0): leftover groups + sound toggle */
+"Application" = "Application";
+"Caches" = "Caches";
+"Application Support" = "Application Support";
+"Preferences" = "Preferences";
+"Logs" = "Logs";
+"Containers" = "Containers";
+"Launch Agents" = "Launch Agents";
+"Other Files" = "Other Files";
+"Sound" = "Sound";
+"Play sound effects" = "Play sound effects";
+
+/* v2.8.1: purgeable honesty */
+"Managed by macOS" = "Managed by macOS";
+"Reserved by macOS - freed automatically when space is needed" = "Reserved by macOS - freed automatically when space is needed";
+
+/* v2.8.2: large-file folder exclusions (#121) */
+"Excluded Folders" = "Excluded Folders";
+"Files inside these folders are skipped from the Large & Old Files scan (Downloads, Documents, Desktop)." = "Files inside these folders are skipped from the Large & Old Files scan (Downloads, Documents, Desktop).";
+"Remove from exclusions" = "Remove from exclusions";
+"Add Folder…" = "Add Folder…";
+
+/* v2.8.2: orphan ignore list (#114) */
+"Always Ignore" = "Always Ignore";
+"Ignore Selected (%lld)" = "Ignore Selected (%lld)";
+"Ignored orphans: %lld" = "Ignored orphans: %lld";
+"Forget Ignored" = "Forget Ignored";
+"Ignored files won't appear in future orphan scans." = "Ignored files won't appear in future orphan scans.";
+
+/* v2.8.3: menu-bar system monitor */
+"System Monitor" = "System Monitor";
+"Show system monitor in menu bar" = "Show system monitor in menu bar";
+"Live CPU, memory, and disk meters in the menu bar. MClean keeps running in the background while this is on." = "Live CPU, memory, and disk meters in the menu bar. MClean keeps running in the background while this is on.";
+"CPU" = "CPU";
+"Memory" = "Memory";
+"Disk" = "Disk";
+"Open MClean" = "Open MClean";
+"Quit MClean" = "Quit MClean";
+
+/* Space Lens */
+"Space Lens" = "Space Lens";
+"See what's taking up space. Scan a folder to map its contents as bubbles you can explore and clean." = "See what's taking up space. Scan a folder to map its contents as bubbles you can explore and clean.";
+"Scan Home Folder" = "Scan Home Folder";
+"Choose Folder…" = "Choose Folder…";
+"%d items" = "%d items";
+"Stop Scan" = "Stop Scan";
+"%d smaller items" = "%d smaller items";
+"Nothing selected" = "Nothing selected";
+"Selected: %@" = "Selected: %@";
+"Move %d items (%@) to the Trash?" = "Move %d items (%@) to the Trash?";
+"Items can be restored from the Trash." = "Items can be restored from the Trash.";
+"Access denied" = "Access denied";
+"Other" = "Other";
+"Couldn't move some items to the Trash" = "Couldn't move some items to the Trash";
+
+/* FDA relaunch detection */
+"Access granted — relaunch to apply" = "Access granted — relaunch to apply";
+"macOS applies Full Disk Access when MClean starts again. Relaunch to finish — takes a second." = "macOS applies Full Disk Access when MClean starts again. Relaunch to finish — takes a second.";
+"Relaunch MClean" = "Relaunch MClean";
+
+/* Donate (About) */
+"Buy me a coffee ☕" = "Buy me a coffee ☕";
+"If MClean is useful to you, a small donation keeps it going. Thank you!" = "If MClean is useful to you, a small donation keeps it going. Thank you!";
+"Scan with MoMo or your banking app (VietQR · Napas 247)" = "Scan with MoMo or your banking app (VietQR · Napas 247)";

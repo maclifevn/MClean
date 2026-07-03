@@ -1,0 +1,401 @@
+/* Sidebar (MainWindow) */
+"Overview" = "概覽";
+"Applications" = "應用程式";
+"Cleanup" = "清理";
+"Dashboard" = "儀表板";
+"Installed Apps" = "已安裝的應用程式";
+"Orphaned Files" = "孤立檔案";
+"MClean" = "MClean";
+"Ready to clean" = "可以清理";
+"Limited access" = "存取受限";
+"Full Disk Access granted" = "已授予完整磁碟取用權";
+"Grant FDA in Settings" = "在「設定」中授予完整磁碟取用權";
+"Select a category from the sidebar to get started." = "從側邊欄選擇一個類別以開始使用。";
+
+/* FDA toast + clean error alert (MainWindow) */
+"Couldn't clean everything" = "無法清理所有項目";
+"Open System Settings" = "打開「系統設定」";
+"OK" = "好";
+"Full Disk Access required" = "需要完整磁碟取用權";
+"macOS blocks MClean from cleaning caches and uninstalling apps until you grant access." = "在你授予取用權之前,macOS 會阻止 MClean 清理快取與解除安裝應用程式。";
+"Grant Access" = "授予取用";
+
+/* Dashboard */
+"Storage" = "儲存空間";
+"Smart Scan" = "智慧掃描";
+"free of %@" = "%@ 中的可用空間";
+"%lld%% used" = "已使用 %lld%%";
+"Used" = "已用";
+"Junk" = "垃圾";
+"Purgeable" = "可清除";
+"USED" = "已用";
+"SCANNING" = "掃描中";
+"Free Space" = "可用空間";
+"Junk Found" = "發現的垃圾";
+"Apps" = "應用程式";
+"of %@ · %lld%% used" = "共 %@ · 已使用 %lld%%";
+"Run a scan" = "執行掃描";
+"across %lld categories" = "跨越 %lld 個類別";
+"installed" = "已安裝";
+"APFS reclaimable" = "APFS 可回收";
+"Suggested for you" = "為你建議";
+"Found so far" = "目前找到";
+"By category" = "依類別";
+"%@ is using %@" = "%@ 正在使用 %@";
+"Grant Full Disk Access for full results" = "授予完整磁碟取用權以取得完整結果";
+"Without it, most caches and uninstall flows fail." = "若沒有它,多數快取清理與解除安裝流程會失敗。";
+"Action" = "動作";
+"Scanning your Mac" = "正在掃描你的 Mac";
+"Currently in: %@" = "目前: %@";
+"found" = "已找到";
+"Your Mac is clean" = "你的 Mac 很乾淨";
+"Scan Again" = "重新掃描";
+"Clean %@" = "清理 %@";
+"Clean %@?" = "清理 %@?";
+"Cleaning…" = "正在清理…";
+"%lld%% complete" = "已完成 %lld%%";
+"freed" = "已釋出";
+"Done" = "完成";
+"%lld items" = "%lld 個項目";
+
+/* Common destructive dialog */
+"Clean" = "清理";
+"Cancel" = "取消";
+"This will permanently delete the selected files. This cannot be undone." = "這會永久刪除所選檔案。此動作無法復原。";
+
+/* Category Detail */
+"All Clean" = "全部乾淨";
+"No junk files found in this category." = "此類別中未發現垃圾檔案。";
+"Not Scanned" = "尚未掃描";
+"Run a scan to analyze this category." = "執行掃描以分析此類別。";
+"Scan Now" = "立即掃描";
+"Filter files" = "篩選檔案";
+"Scan" = "掃描";
+"Select All" = "全選";
+"Deselect All" = "取消全選";
+"Largest First" = "最大優先";
+"Smallest First" = "最小優先";
+"Sorted: Largest First" = "排序:最大優先";
+"Sorted: Smallest First" = "排序:最小優先";
+"Clean %lld items" = "清理 %lld 個項目";
+"%lld items · %@" = "%lld 個項目 · %@";
+"Scanning…" = "掃描中…";
+"Rescan" = "重新掃描";
+"%lld of %lld selected" = "已選 %lld / %lld";
+"Reveal in Finder" = "在 Finder 中顯示";
+"Copy Path" = "複製路徑";
+"Move to Trash" = "移到垃圾桶";
+
+/* Apps (AppListView) */
+"Search apps" = "搜尋應用程式";
+"Refresh" = "重新整理";
+"Installed Apps (%lld)" = "已安裝的應用程式 (%lld)";
+"Loading installed apps..." = "正在載入已安裝的應用程式...";
+"No Apps Found" = "找不到應用程式";
+"Could not find any installed applications." = "找不到任何已安裝的應用程式。";
+"Retry" = "重試";
+"Application" = "應用程式";
+"Size" = "大小";
+"Select an App" = "選擇應用程式";
+"Select an app from the list to see all its related files across your system." = "從清單中選擇一個應用程式以查看系統中所有相關檔案。";
+
+/* App Files (AppFilesView) */
+"%lld files" = "%lld 個檔案";
+"Scanning for related files..." = "正在掃描相關檔案...";
+"Checking %lld locations..." = "正在檢查 %lld 個位置...";
+"No Related Files" = "沒有相關檔案";
+"No additional files found for %@." = "找不到 %@ 的額外檔案。";
+"Remove %lld files (%@)" = "移除 %lld 個檔案 (%@)";
+"Removal Failed" = "移除失敗";
+"Remove this file" = "移除此檔案";
+"Remove %@?" = "移除 %@?";
+"Remove" = "移除";
+"This will permanently delete this file. This action cannot be undone." = "這會永久刪除此檔案。此動作無法復原。";
+
+/* Orphans */
+"Scanning for orphaned files..." = "正在掃描孤立檔案...";
+"No Orphaned Files" = "沒有孤立檔案";
+"No leftover files from uninstalled apps were found." = "未發現已解除安裝應用程式的殘留檔案。";
+"Scan for Orphans" = "掃描孤立檔案";
+"Orphaned Files (%lld)" = "孤立檔案 (%lld)";
+"Remove Selected (%lld)" = "移除所選 (%lld)";
+"Some files could not be removed" = "部分檔案無法移除";
+
+/* Onboarding */
+"Back" = "返回";
+"Next" = "下一步";
+"Get Started" = "開始使用";
+"Welcome to MClean" = "歡迎使用 MClean";
+"Free, open-source macOS app manager and system cleaner." = "免費、開放原始碼的 macOS 應用程式管理與系統清理工具。";
+"Find junk files across your system" = "在系統中尋找垃圾檔案";
+"App Uninstaller" = "應用程式解除安裝";
+"Remove apps and all their files" = "移除應用程式及其所有檔案";
+"Orphan Finder" = "孤立檔案搜尋";
+"Find leftovers from deleted apps" = "尋找已刪除應用程式的殘留";
+"Full Disk Access" = "完整磁碟取用權";
+"MClean needs Full Disk Access to uninstall apps, find leftover files, and clean protected caches." = "MClean 需要完整磁碟取用權以解除安裝應用程式、尋找殘留檔案,以及清理受保護的快取。";
+"We'll guide you through the next steps." = "我們將引導你完成接下來的步驟。";
+"In System Settings, do this:" = "在「系統設定」中執行以下步驟:";
+"Privacy & Security → Full Disk Access" = "隱私權與安全性 → 完整磁碟取用權";
+"Find **MClean** and turn the toggle on" = "找到 **MClean** 並開啟開關";
+"Authenticate with Touch ID or your password" = "使用觸控 ID 或密碼進行驗證";
+"Reopen Settings" = "重新打開「設定」";
+"MClean isn't in the list — reveal it" = "MClean 不在清單中 — 顯示它";
+"Reset permissions and re-prompt" = "重置權限並重新提示";
+"Hide diagnostics" = "隱藏診斷";
+"Show diagnostics" = "顯示診斷";
+"Trouble?" = "遇到問題?";
+"Waiting for permission…" = "等待授權…";
+"Permission granted." = "已授予權限。";
+"MClean can now manage protected files." = "MClean 現在可以管理受保護的檔案。";
+"You're Ready" = "已就緒";
+"%lld/%lld protected locations accessible" = "可存取的受保護位置 %lld/%lld";
+"Some features will be limited. You can grant Full Disk Access later in System Settings." = "部分功能將受到限制。你可以稍後在「系統設定」中授予完整磁碟取用權。";
+"Trash" = "垃圾桶";
+"Mail Data" = "Mail 資料";
+"Safari Data" = "Safari 資料";
+"Desktop" = "桌面";
+"Documents" = "文件";
+"TCC Database" = "TCC 資料庫";
+"Blocked" = "已阻擋";
+
+/* Settings */
+"General" = "一般";
+"Cleaning" = "清理";
+"Schedule" = "排程";
+"About" = "關於";
+"Startup" = "啟動";
+"Launch MClean at login" = "登入時啟動 MClean";
+"App Scanning" = "應用程式掃描";
+"Search sensitivity" = "搜尋敏感度";
+"Strict" = "嚴格";
+"Enhanced" = "加強";
+"Deep" = "深度";
+"Exact bundle ID and name matches only. Safest option." = "僅精確比對套件 ID 與名稱。最安全選項。";
+"Includes partial name matching and bundle ID components." = "包含部分名稱比對與套件 ID 組件。";
+"Includes company name, entitlements, and team identifier matching." = "包含公司名稱、授權與團隊識別碼的比對。";
+"Language" = "語言";
+"Restart MClean to apply the selected language." = "請重新啟動 MClean 以套用所選語言。";
+"Relaunch Now" = "立即重新啟動";
+"System Default" = "系統預設";
+"English" = "英文";
+"Spanish" = "西班牙文";
+"Japanese" = "日文";
+"Arabic" = "阿拉伯文";
+"Portuguese (Brazil)" = "葡萄牙文(巴西)";
+"Chinese (Simplified)" = "簡體中文";
+"Chinese (Traditional)" = "繁體中文";
+"Safety" = "安全";
+"Confirm before deleting files" = "刪除檔案前確認";
+"File Discovery" = "檔案探索";
+"Skip hidden files during scan" = "掃描時略過隱藏檔案";
+"Large Files" = "大型檔案";
+"Minimum size: %lld MB" = "最小大小: %lld MB";
+"Files older than: %lld months" = "早於: %lld 個月的檔案";
+"Automatic Scanning" = "自動掃描";
+"Enable scheduled scanning" = "啟用排程掃描";
+"Scan interval" = "掃描間隔";
+"Auto-clean after scan" = "掃描後自動清理";
+"Auto-purge purgeable space" = "自動清除可清除空間";
+"Notify on completion" = "完成時通知";
+"Last run" = "上次執行";
+"Version %@" = "版本 %@";
+"Free, open-source macOS app manager." = "免費、開放原始碼的 macOS 應用程式管理工具。";
+"GitHub Repository" = "GitHub 儲存庫";
+"Report an Issue" = "回報問題";
+"MIT License" = "MIT 授權";
+
+/* Cleaning categories (CleaningCategory.rawValue) */
+"System Junk" = "系統垃圾";
+"User Cache" = "使用者快取";
+"AI Apps" = "AI 應用程式";
+"Mail Files" = "Mail 檔案";
+"Trash Bins" = "垃圾桶";
+"Large & Old Files" = "大型與舊檔案";
+"Purgeable Space" = "可清除空間";
+"Xcode Junk" = "Xcode 垃圾";
+"Brew Cache" = "Brew 快取";
+"Node Cache" = "Node 快取";
+"Docker Cache" = "Docker 快取";
+
+/* Cleaning category descriptions */
+"Scan everything at once" = "一次掃描所有項目";
+"System caches, logs, and temporary files" = "系統快取、紀錄與暫存檔案";
+"Application caches and browser data" = "應用程式快取與瀏覽器資料";
+"Local AI app logs, caches, and optional history" = "本地 AI 應用程式的紀錄、快取與選用記錄";
+"Downloaded mail attachments" = "已下載的郵件附件";
+"Files in your Trash" = "垃圾桶中的檔案";
+"Files over 100 MB or older than 1 year" = "超過 100 MB 或一年以上的檔案";
+"APFS purgeable disk space" = "APFS 可清除的磁碟空間";
+"Derived data, archives, and simulators" = "衍生資料、封存與模擬器";
+"Homebrew download cache" = "Homebrew 下載快取";
+"npm, yarn, and pnpm download caches" = "npm、yarn 與 pnpm 下載快取";
+"Docker images, containers, and build cache" = "Docker 映像檔、容器與建置快取";
+
+/* Node Cache subcategories */
+"npm cache" = "npm 快取";
+"yarn classic cache" = "yarn 經典快取";
+"pnpm content-addressable store" = "pnpm 內容定址儲存庫";
+
+/* Docker Cache helper */
+"Reclaimable (run `docker system prune -af`)" = "可回收(執行 `docker system prune -af`)";
+
+/* Schedule intervals (ScheduleInterval.rawValue) */
+"Every Hour" = "每小時";
+"Every 3 Hours" = "每 3 小時";
+"Every 6 Hours" = "每 6 小時";
+"Every 12 Hours" = "每 12 小時";
+"Daily" = "每天";
+"Weekly" = "每週";
+"Every 2 Weeks" = "每 2 週";
+"Monthly" = "每月";
+
+/* Schedule status */
+"Never" = "從未";
+"Not scheduled" = "未排程";
+
+/* Appearance modes (AppearanceMode.label) */
+"System" = "系統";
+"Light" = "淺色";
+"Dark" = "深色";
+
+/* Notifications */
+"Found %@ of junk files." = "找到 %@ 的垃圾檔案。";
+
+/* Permission Sheet */
+"Grant Full Disk Access" = "授予完整磁碟存取權限";
+"%lld item(s) need Full Disk Access" = "%lld 個項目需要完整磁碟存取權限";
+"Uninstalling %@: %lld file(s) need Full Disk Access" = "解除安裝 %@：%lld 個檔案需要完整磁碟存取權限";
+"%lld item(s) need Full Disk Access to remove. Tap Grant Access to fix in one step." = "%lld 個項目需要完整磁碟存取權限才能移除。輕點「授予存取權限」一步解決。";
+"Couldn't remove %@%@. They may be in use or protected by macOS." = "無法移除 %@%@。它們可能正在使用或受 macOS 保護。";
+" and %lld more" = " 還有 %lld 個";
+"Access granted. Retrying…" = "已授予存取權限。正在重試…";
+"1-tap setup. We'll detect the change automatically." = "一鍵設定。我們會自動偵測變更。";
+"Open Settings & reveal MClean" = "開啟「系統設定」並顯示 MClean";
+"We'll open both windows side-by-side." = "我們會並排開啟兩個視窗。";
+"Turn on MClean" = "開啟 MClean";
+"Toggle the row that appears." = "打開出現的那一列。";
+"Authenticate" = "驗證身分";
+"Touch ID or password." = "Touch ID 或密碼。";
+"We auto-retry — no need to come back." = "我們會自動重試 - 不需返回。";
+"Watching for permission change…" = "正在等待權限變更…";
+"MClean not in the list?" = "MClean 不在清單裡？";
+"Hide help" = "隱藏說明";
+"Try this if MClean doesn't appear:" = "如果 MClean 沒有出現，請嘗試：";
+"Reveal app" = "顯示 App";
+"Drag MClean.app into the list" = "將 MClean.app 拖到清單";
+"Reset + reprompt" = "重設並重新提示";
+"Clear stale TCC entry" = "清除過時的 TCC 條目";
+"+ %lld more" = "+ 還有 %lld 個";
+"%lld blocked path(s)" = "%lld 個被封鎖的路徑";
+"Access granted" = "已授予存取權限";
+"Retrying the operation now." = "正在重試此操作。";
+"Skip for now" = "暫時略過";
+"I granted it — retry" = "我已授予 - 重試";
+
+/* Dashboard polish */
+"Low space" = "空間不足";
+"CLEANING" = "正在清理";
+"Quick Setup" = "快速設定";
+"1-tap setup. We'll auto-retry what failed." = "一鍵設定。我們會自動重試失敗的操作。";
+"Fix permission" = "修正權限";
+"Dismiss" = "略過";
+
+/* Onboarding v2 */
+"Reclaim your Mac" = "奪回你的 Mac";
+"Apple sells you small disks. We help you keep them clean." = "蘋果賣給你小硬碟。我們幫你保持整潔。";
+"Free. Open source. MIT licensed." = "免費。開放原始碼。MIT 授權。";
+"What's inside" = "裡面有什麼";
+"Three things, done well." = "三件事，做到極致。";
+"Find caches, logs, broken installs, and the AI-app history hiding in your library." = "找出快取、日誌、損壞的安裝檔，以及隱藏在資料庫中的 AI App 紀錄。";
+"Drag an app, see every file it dropped, remove all of it. No leftovers." = "拖入一個 App，看到它留下的每個檔案，全部清除。不留殘餘。";
+"Surfaces files that outlived the apps that created them." = "顯示比建立它們的 App 更長壽的檔案。";
+"One permission, then we're done" = "一個權限，就夠了";
+"Permission granted" = "已授予權限";
+"MClean can now reach the locations macOS protects by default." = "MClean 現在可以存取 macOS 預設保護的位置。";
+"macOS hides certain folders from every app until you say otherwise. We need them to find caches and uninstall cleanly." = "在你允許之前，macOS 對所有 App 隱藏某些檔案夾。我們需要它們才能找到快取並乾淨地解除安裝。";
+"All set — moving you to the next step." = "一切就緒 - 進入下一步。";
+"Reveal app again" = "再次顯示 App";
+"Reset permissions" = "重設權限";
+"You're ready" = "已準備就緒";
+"Ready when you are" = "隨時為你準備好";
+"Hit Start to run your first Smart Scan." = "按開始執行你的第一次智慧掃描。";
+"Skip" = "略過";
+"Start" = "開始";
+"Continue" = "繼續";
+
+/* Drag handle */
+"Drag to the Settings list" = "拖到設定清單";
+"Drag this icon into the Full Disk Access list in System Settings." = "將此圖示拖入系統設定中的完整磁碟存取清單。";
+"Tip: drag the icon on the left straight into the list." = "提示：把左側圖示直接拖入清單。";
+"Or drag the icon on the left straight into Settings." = "或者把左側圖示直接拖入設定。";
+
+/* Dashboard storage composition (v2.7.0) */
+"Storage composition" = "儲存空間組成";
+"total" = "總計";
+"Free" = "可用";
+
+/* UI polish (v2.8.0): leftover groups + sound toggle */
+"Application" = "應用程式";
+"Caches" = "快取";
+"Application Support" = "應用程式支援";
+"Preferences" = "偏好設定";
+"Logs" = "日誌";
+"Containers" = "容器";
+"Launch Agents" = "啟動代理";
+"Other Files" = "其他檔案";
+"Sound" = "聲音";
+"Play sound effects" = "播放音效";
+
+/* v2.8.1: purgeable honesty */
+"Managed by macOS" = "由 macOS 管理";
+"Reserved by macOS - freed automatically when space is needed" = "由 macOS 保留 - 需要空間時自動釋放";
+
+/* v2.8.2: large-file folder exclusions (#121) */
+"Excluded Folders" = "排除的資料夾";
+"Files inside these folders are skipped from the Large & Old Files scan (Downloads, Documents, Desktop)." = "這些資料夾中的檔案會在「大型與舊檔案」掃描（下載、文件、桌面）中被略過。";
+"Remove from exclusions" = "從排除項目中移除";
+"Add Folder…" = "加入資料夾…";
+
+/* v2.8.2: orphan ignore list (#114) */
+"Always Ignore" = "永遠忽略";
+"Ignore Selected (%lld)" = "忽略所選 (%lld)";
+"Ignored orphans: %lld" = "已忽略的孤立檔案：%lld";
+"Forget Ignored" = "清除已忽略";
+"Ignored files won't appear in future orphan scans." = "已忽略的檔案不會出現在日後的孤立檔案掃描中。";
+
+/* v2.8.3: menu-bar system monitor */
+"System Monitor" = "系統監視器";
+"Show system monitor in menu bar" = "在選單列中顯示系統監視器";
+"Live CPU, memory, and disk meters in the menu bar. MClean keeps running in the background while this is on." = "在選單列中即時顯示 CPU、記憶體和磁碟使用情況。開啟時 MClean 會在背景持續執行。";
+"CPU" = "CPU";
+"Memory" = "記憶體";
+"Disk" = "磁碟";
+"Open MClean" = "開啟 MClean";
+"Quit MClean" = "結束 MClean";
+
+/* Space Lens */
+"Space Lens" = "Space Lens";
+"See what's taking up space. Scan a folder to map its contents as bubbles you can explore and clean." = "看看是什麼佔用了空間。掃描資料夾,將其內容以泡泡圖呈現,可逐層瀏覽並清理。";
+"Scan Home Folder" = "掃描個人資料夾";
+"Choose Folder…" = "選擇資料夾…";
+"%d items" = "%d 個項目";
+"Stop Scan" = "停止掃描";
+"%d smaller items" = "%d 個較小項目";
+"Nothing selected" = "未選取任何項目";
+"Selected: %@" = "已選取:%@";
+"Move %d items (%@) to the Trash?" = "將 %d 個項目(%@)移到垃圾桶?";
+"Items can be restored from the Trash." = "項目可從垃圾桶還原。";
+"Access denied" = "拒絕存取";
+"Other" = "其他";
+"Couldn't move some items to the Trash" = "部分項目無法移到垃圾桶";
+
+/* FDA relaunch detection */
+"Access granted — relaunch to apply" = "已授予權限 — 重新啟動後生效";
+"macOS applies Full Disk Access when MClean starts again. Relaunch to finish — takes a second." = "macOS 會在 MClean 重新啟動後套用完整磁碟取用權限。重新啟動即可完成 — 只需一秒。";
+"Relaunch MClean" = "重新啟動 MClean";
+
+/* Donate (About) */
+"Buy me a coffee ☕" = "請我喝杯咖啡 ☕";
+"If MClean is useful to you, a small donation keeps it going. Thank you!" = "如果 MClean 對你有幫助,小小的贊助能讓它持續發展。謝謝!";
+"Scan with MoMo or your banking app (VietQR · Napas 247)" = "用 MoMo 或銀行 App 掃碼 (VietQR · Napas 247)";

@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(which rsvg-convert *)",
+      "Read(//Volumes/DATA/Code/**)",
+      "Read(//opt/homebrew/**)",
+      "Bash(xcodebuild -version)",
+      "Bash(mkdir -p /Users/maclife/.claude/plans)"
+    ]
+  }
+}
