@@ -2,7 +2,6 @@ import SwiftUI
 
 struct MainWindow: View {
     @EnvironmentObject var appState: AppState
-    @EnvironmentObject var theme: ThemeManager
     @ObservedObject private var sandboxAccess = SandboxAccessManager.shared
     @State private var selectedSection: AppSection? = .cleaning(.smartScan)
     @State private var columnVisibility: NavigationSplitViewVisibility = .all
@@ -18,11 +17,6 @@ struct MainWindow: View {
             detailContainer
         }
         .frame(minWidth: 980, minHeight: 600)
-        .toolbar {
-            ToolbarItem(placement: .navigation) {
-                appearancePicker
-            }
-        }
         .onReceive(NotificationCenter.default.publisher(for: .mCleanSmartScanRequested)) { _ in
             consumeMenuBarSmartScanRequest()
         }
@@ -157,15 +151,6 @@ struct MainWindow: View {
         .padding(.horizontal, 12)
         .padding(.vertical, 8)
         .background(.bar)
-    }
-
-    // MARK: - Toolbar
-
-    private var appearancePicker: some View {
-        AppearancePill(selection: Binding(
-            get: { theme.appearance },
-            set: { theme.appearance = $0 }
-        ))
     }
 
     // MARK: - Detail

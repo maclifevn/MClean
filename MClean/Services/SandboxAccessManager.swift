@@ -46,7 +46,16 @@ final class SandboxAccessManager: ObservableObject {
     func requestFullScanAccessOnLaunch() {
         guard !hasFullScanAccess, !presentedAutomaticFullScanRequest else { return }
         presentedAutomaticFullScanRequest = true
-        _ = requestFullScanAccess()
+        let panel = makeFullScanPanel()
+        // Automatic consent must be modeless. Calling runModal from a SwiftUI
+        // onAppear callback can re-enter AppKit while the window is laying out,
+        // which triggers _NSDetectedLayoutRecursion.
+        panel.begin { [weak self] response in
+            guard response == .OK else { return }
+            Task { @MainActor [weak self] in
+                _ = self?.acceptFullScanSelection(panel.url)
+            }
+        }
     }
 
     /// Requests the single user-controlled grant needed to preserve the
@@ -56,18 +65,25 @@ final class SandboxAccessManager: ObservableObject {
     @discardableResult
     func requestFullScanAccess() -> Bool {
         guard !hasFullScanAccess else { return true }
+        let panel = makeFullScanPanel()
+        guard panel.runModal() == .OK else { return false }
+        return acceptFullScanSelection(panel.url)
+    }
 
+    private func makeFullScanPanel() -> NSOpenPanel {
         let panel = NSOpenPanel()
         panel.canChooseDirectories = true
         panel.canChooseFiles = false
         panel.allowsMultipleSelection = false
         panel.canCreateDirectories = false
         panel.directoryURL = URL(fileURLWithPath: "/Volumes", isDirectory: true)
-        panel.nameFieldStringValue = startupDiskDisplayName
         panel.prompt = String(localized: "Allow Full Scan")
         panel.message = String(localized: "Select your startup disk to let MClean scan the same locations as the original version.")
-        guard panel.runModal() == .OK, let selected = panel.url?.standardizedFileURL else { return false }
+        return panel
+    }
 
+    private func acceptFullScanSelection(_ selection: URL?) -> Bool {
+        guard let selected = selection?.standardizedFileURL else { return false }
         let resolved = selected.resolvingSymlinksInPath().standardizedFileURL
         guard resolved == Self.startupDiskURL else {
             let alert = NSAlert()
@@ -83,11 +99,6 @@ final class SandboxAccessManager: ObservableObject {
         // symlink only for validation so the bookmark retains the system-issued
         // sandbox extension.
         return persistPanelURLs([selected])
-    }
-
-    private var startupDiskDisplayName: String {
-        (try? Self.startupDiskURL.resourceValues(forKeys: [.localizedNameKey]).localizedName)
-            ?? String(localized: "Startup Disk")
     }
 
     @discardableResult

@@ -1,4 +1,10 @@
 import Foundation
+import os
+
+private let spaceLensLogger = os.Logger(
+    subsystem: Bundle.main.bundleIdentifier ?? "com.maclife.mclean",
+    category: "SpaceLens"
+)
 
 /// Builds the Space Lens size tree: one full recursive pass over a chosen
 /// folder, sizing every file and keeping nodes only for directories and
@@ -69,6 +75,7 @@ actor SpaceLensEngine {
     func scan(root: URL,
               minNodeSize: Int64 = 1_048_576,
               onProgress: @escaping @Sendable (Progress) -> Void) async throws -> SpaceLensNode {
+        let startedAt = Date()
         let progress = ProgressBox(onProgress: onProgress)
         let fileManager = FileManager.default
 
@@ -105,7 +112,11 @@ actor SpaceLensEngine {
         try await withThrowingTaskGroup(of: SpaceLensNode.self) { group in
             var pending = subdirectories.makeIterator()
             var inFlight = 0
-            let cap = max(2, ProcessInfo.processInfo.activeProcessorCount)
+            // Filesystem traversal is I/O-bound. Matching a high core count
+            // with that many recursive walkers makes APFS seek between large
+            // trees and is slower on real Home folders. Four keeps the disk
+            // busy without starving the UI or creating memory pressure.
+            let cap = min(4, max(2, ProcessInfo.processInfo.activeProcessorCount))
 
             func submitNext() {
                 guard let dir = pending.next() else { return }
@@ -119,7 +130,12 @@ actor SpaceLensEngine {
             while inFlight > 0 {
                 guard let node = try await group.next() else { break }
                 inFlight -= 1
-                childNodes.append(node)
+                if node.size >= minNodeSize || node.isAccessDenied {
+                    childNodes.append(node)
+                } else {
+                    pruned.count += max(1, node.prunedCount)
+                    pruned.size += node.size
+                }
                 submitNext()
             }
         }
@@ -144,6 +160,11 @@ actor SpaceLensEngine {
             prunedCount: pruned.count, prunedSize: pruned.size
         )
         rootNode.isAccessDenied = rootDenied
+        let elapsed = Date().timeIntervalSince(startedAt)
+        let elapsedText = String(format: "%.2f", elapsed)
+        spaceLensLogger.info(
+            "Scan completed in \(elapsedText, privacy: .public)s; \(rootNode.size, privacy: .public) bytes"
+        )
         return rootNode
     }
 
@@ -181,8 +202,17 @@ actor SpaceLensEngine {
             // directory reports isDirectory == true and following it would
             // double-count (or loop).
             if !isSymlink, values.isDirectory ?? false, !isPackage {
-                children.append(try buildTree(at: entry, minNodeSize: minNodeSize,
-                                              progress: progress))
+                let child = try buildTree(at: entry, minNodeSize: minNodeSize,
+                                          progress: progress)
+                if child.size >= minNodeSize || child.isAccessDenied {
+                    children.append(child)
+                } else {
+                    // Small directory trees are represented by the parent's
+                    // aggregate instead of allocating a node for every nested
+                    // build/cache folder. Their bytes still count exactly.
+                    prunedCount += max(1, child.prunedCount)
+                    prunedSize += child.size
+                }
                 continue
             }
 

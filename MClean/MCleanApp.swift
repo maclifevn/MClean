@@ -15,6 +15,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSWindow.allowsAutomaticWindowTabbing = false
+        // Appearance is now fully system-native; discard the retired manual
+        // light/dark override from older builds.
+        UserDefaults.standard.removeObject(forKey: "MClean.Appearance")
 
         // The status item is a core quick-access surface for new installs.
         // `register` preserves an existing explicit opt-out.
@@ -86,7 +89,6 @@ extension Notification.Name {
 struct MCleanApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
     @StateObject private var appState = AppState()
-    @StateObject private var theme = ThemeManager.shared
     @AppStorage("MClean.OnboardingComplete") private var onboardingComplete = false
 
     init() {
@@ -110,8 +112,6 @@ struct MCleanApp: App {
                     OnboardingView(isComplete: $onboardingComplete)
                 }
             }
-            .environmentObject(theme)
-            .preferredColorScheme(theme.appearance.colorScheme)
             // Record the openWindow action so the menu-bar popover can reopen
             // this window after it's been closed (the popover lives outside the
             // scene graph and can't use openWindow itself).

@@ -1,49 +1,6 @@
 import AppKit
 import SwiftUI
 
-/// User-overridable appearance setting that lives independently of the system
-/// preference, mirroring the prototype's titlebar light/dark toggle.
-enum AppearanceMode: String, CaseIterable, Identifiable {
-    case system, light, dark
-    var id: String { rawValue }
-
-    var label: String {
-        switch self {
-        case .system: return "System"
-        case .light: return "Light"
-        case .dark: return "Dark"
-        }
-    }
-
-    var icon: String {
-        switch self {
-        case .system: return "circle.lefthalf.filled"
-        case .light: return "sun.max.fill"
-        case .dark: return "moon.fill"
-        }
-    }
-
-    var colorScheme: ColorScheme? {
-        switch self {
-        case .system: return nil
-        case .light: return .light
-        case .dark: return .dark
-        }
-    }
-}
-
-@MainActor
-final class ThemeManager: ObservableObject {
-    static let shared = ThemeManager()
-
-    @AppStorage("MClean.Appearance") private var rawValue: String = AppearanceMode.system.rawValue
-
-    var appearance: AppearanceMode {
-        get { AppearanceMode(rawValue: rawValue) ?? .system }
-        set { rawValue = newValue.rawValue; objectWillChange.send() }
-    }
-}
-
 /// Centralized accent palette. One blue, one green for success, one orange
 /// for warning, one red for destructive. Other tints exist for categorical
 /// differentiation but the surface chrome only uses these four.
