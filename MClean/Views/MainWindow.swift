@@ -6,6 +6,13 @@ struct MainWindow: View {
     @ObservedObject private var permission = PermissionCoordinator.shared
     @State private var selectedSection: AppSection? = .cleaning(.smartScan)
     @State private var columnVisibility: NavigationSplitViewVisibility = .all
+    /// Set while the user is in a section they reached by clicking a
+    /// dashboard result (issue #2 follow-up): `target` is where they jumped
+    /// to, `returnTo` is the dashboard they came from. Drives the toolbar
+    /// Back button; cleared as soon as they navigate anywhere else via the
+    /// sidebar, so the button never shows on organic navigation.
+    @State private var backTargetSection: AppSection?
+    @State private var backReturnSection: AppSection?
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.colorScheme) private var colorScheme
 
@@ -21,6 +28,19 @@ struct MainWindow: View {
         .toolbar {
             ToolbarItem(placement: .navigation) {
                 appearancePicker
+            }
+            ToolbarItem(placement: .navigation) {
+                if backTargetSection != nil, selectedSection == backTargetSection {
+                    Button {
+                        selectedSection = backReturnSection ?? .cleaning(.smartScan)
+                        backTargetSection = nil
+                        backReturnSection = nil
+                    } label: {
+                        Label("Back", systemImage: "chevron.left")
+                            .labelStyle(.titleAndIcon)
+                    }
+                    .help("Back")
+                }
             }
         }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
@@ -38,10 +58,21 @@ struct MainWindow: View {
             appState.pendingExternalApp = nil
         }
         .onChange(of: appState.requestedSection) { section in
-            // A dashboard result was clicked — jump to that section.
+            // A dashboard result was clicked — jump to that section and
+            // remember where to come back to for the toolbar Back button.
             guard let section else { return }
+            backReturnSection = selectedSection ?? .cleaning(.smartScan)
+            backTargetSection = section
             selectedSection = section
             appState.requestedSection = nil
+        }
+        .onChange(of: selectedSection) { newSection in
+            // Any navigation away from the jumped-to section (sidebar click,
+            // Back itself) invalidates the back context.
+            if let target = backTargetSection, newSection != target {
+                backTargetSection = nil
+                backReturnSection = nil
+            }
         }
         .onAppear {
             // Covers a request that landed before MainWindow mounted (cold
