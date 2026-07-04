@@ -159,31 +159,15 @@ private struct SpaceLensResultView: View {
         .background(.bar)
     }
 
+    @ViewBuilder
     private func crumb(for node: SpaceLensNode, isRoot: Bool, isLast: Bool) -> some View {
-        Button {
+        // A plain `Button` here stopped receiving clicks on macOS 15 (Sequoia):
+        // inside a horizontal ScrollView the scroll gesture wins over the
+        // button's tap. An explicit onTapGesture on a contentShape'd view is
+        // reliable across macOS versions. The current (last) crumb is inert.
+        SpaceLensCrumb(node: node, isRoot: isRoot, isLast: isLast) {
             lens.pop(to: isRoot ? nil : node)
-        } label: {
-            HStack(spacing: 4) {
-                if isRoot {
-                    Image(systemName: "internaldrive.fill")
-                        .font(.system(size: 10))
-                }
-                Text(verbatim: node.name)
-                    .font(.system(size: 12, weight: isLast ? .semibold : .regular))
-                Text(verbatim: node.formattedSize)
-                    .font(.system(size: 11))
-                    .foregroundStyle(.secondary)
-                    .monospacedDigit()
-            }
-            .padding(.horizontal, 8)
-            .padding(.vertical, 3)
-            .background(
-                Capsule().fill(isLast ? Tint.cyan.opacity(0.14) : Color.clear)
-            )
-            .contentShape(Capsule())
         }
-        .buttonStyle(.plain)
-        .disabled(isLast)
     }
 
     // MARK: Child list
@@ -262,6 +246,62 @@ private struct SpaceLensResultView: View {
             Button("Cancel", role: .cancel) {}
         } message: {
             Text("Items can be restored from the Trash.")
+        }
+    }
+}
+
+/// A single breadcrumb. Uses onTapGesture rather than Button so the tap
+/// isn't eaten by the enclosing horizontal ScrollView on macOS 15.
+private struct SpaceLensCrumb: View {
+    let node: SpaceLensNode
+    let isRoot: Bool
+    let isLast: Bool
+    let onTap: () -> Void
+
+    @State private var hovering = false
+
+    var body: some View {
+        HStack(spacing: 4) {
+            if isRoot {
+                Image(systemName: "internaldrive.fill")
+                    .font(.system(size: 10))
+            }
+            Text(verbatim: node.name)
+                .font(.system(size: 12, weight: isLast ? .semibold : .regular))
+            Text(verbatim: node.formattedSize)
+                .font(.system(size: 11))
+                .foregroundStyle(.secondary)
+                .monospacedDigit()
+        }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 3)
+        .background(
+            Capsule().fill(
+                isLast ? Tint.cyan.opacity(0.14)
+                       : (hovering ? Color.primary.opacity(0.08) : Color.clear)
+            )
+        )
+        .contentShape(Capsule())
+        .onTapGesture {
+            guard !isLast else { return }
+            onTap()
+        }
+        .onHover { hovering = !isLast && $0 }
+        // Pointing-hand cursor on the clickable (non-current) crumbs.
+        .pointerStyleLink(enabled: !isLast)
+        .accessibilityAddTraits(isLast ? [] : .isButton)
+    }
+}
+
+private extension View {
+    /// Shows the link (pointing hand) cursor on hover when enabled. Wrapped so
+    /// the macOS 15-only `.pointerStyle` degrades gracefully on macOS 13–14.
+    @ViewBuilder
+    func pointerStyleLink(enabled: Bool) -> some View {
+        if #available(macOS 15.0, *) {
+            self.pointerStyle(enabled ? .link : nil)
+        } else {
+            self
         }
     }
 }
