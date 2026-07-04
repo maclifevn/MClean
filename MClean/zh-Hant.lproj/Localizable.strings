@@ -400,3 +400,6 @@
 "Buy me a coffee ☕" = "請我喝杯咖啡 ☕";
 "If MClean is useful to you, a small donation keeps it going. Thank you!" = "如果 MClean 對你有幫助,小小的贊助能讓它持續發展。謝謝!";
 "Scan with MoMo or your banking app (VietQR · Napas 247)" = "用 MoMo 或銀行 App 掃碼 (VietQR · Napas 247)";
+
+/* Dashboard category row */
+"Select all in this category" = "選擇此類別中的全部";

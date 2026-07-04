@@ -400,3 +400,6 @@
 "Buy me a coffee ☕" = "コーヒーをおごる ☕";
 "If MClean is useful to you, a small donation keeps it going. Thank you!" = "MClean が役に立ったら、小さな寄付が開発の支えになります。ありがとうございます!";
 "Scan with MoMo or your banking app (VietQR · Napas 247)" = "MoMo または銀行アプリでスキャン (VietQR · Napas 247)";
+
+/* Dashboard category row */
+"Select all in this category" = "このカテゴリをすべて選択";

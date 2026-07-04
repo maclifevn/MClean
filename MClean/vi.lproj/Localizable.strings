@@ -400,3 +400,6 @@
 "Buy me a coffee ☕" = "Mời tôi ly cà phê ☕";
 "If MClean is useful to you, a small donation keeps it going. Thank you!" = "Nếu MClean hữu ích với bạn, một khoản ủng hộ nhỏ giúp nó tiếp tục phát triển. Cảm ơn bạn!";
 "Scan with MoMo or your banking app (VietQR · Napas 247)" = "Quét bằng MoMo hoặc ứng dụng ngân hàng (VietQR · Napas 247)";
+
+/* Dashboard category row */
+"Select all in this category" = "Chọn tất cả trong hạng mục này";

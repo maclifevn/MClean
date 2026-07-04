@@ -122,6 +122,11 @@ final class AppState: ObservableObject {
     /// lands before MainWindow mounts (cold launch, or while onboarding is
     /// still showing) is still surfaced — a one-shot token would be missed.
     @Published var pendingExternalApp: InstalledApp?
+    /// Sidebar section the UI should jump to. Set by the dashboard when the
+    /// user clicks a category result so the detail pane opens; MainWindow
+    /// consumes it (onChange + onAppear) and clears it. Same one-shot pattern
+    /// as `pendingExternalApp`.
+    @Published var requestedSection: AppSection?
 
     private var externalUninstallObserver: AnyCancellable?
 

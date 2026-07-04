@@ -177,6 +177,9 @@ struct CategoryBarChart: View {
     }
 
     let bars: [Bar]
+    /// Called with the tapped bar's category, so the dashboard can navigate to
+    /// that category's detail view (issue #2). Nil = chart is display-only.
+    var onSelect: ((CleaningCategory) -> Void)? = nil
 
     @State private var reveal: Double = 0
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -215,6 +218,26 @@ struct CategoryBarChart: View {
             }
         }
         .chartLegend(.hidden)
+        .chartOverlay { proxy in
+            if let onSelect {
+                GeometryReader { geo in
+                    Rectangle()
+                        .fill(.clear)
+                        .contentShape(Rectangle())
+                        .onTapGesture { location in
+                            // Map the tap's y to the category band it landed on.
+                            // plotAreaFrame works from macOS 13 (plotFrame is 14+).
+                            let origin = geo[proxy.plotAreaFrame].origin
+                            let name: String? = proxy.value(
+                                atY: location.y - origin.y, as: String.self)
+                            if let name,
+                               let bar = bars.first(where: { $0.name == name }) {
+                                onSelect(bar.category)
+                            }
+                        }
+                }
+            }
+        }
         .frame(height: max(120, CGFloat(bars.count) * 34))
     }
 }

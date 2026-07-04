@@ -529,7 +529,9 @@ struct DashboardView: View {
             .map { CategoryBarChart.Bar(category: $0.category, size: $0.totalSize) }
 
         return CardSurface(padding: 18, elevation: .standard) {
-            CategoryBarChart(bars: Array(bars))
+            CategoryBarChart(bars: Array(bars)) { category in
+                appState.requestedSection = .cleaning(category)
+            }
         }
     }
 
@@ -848,36 +850,64 @@ private struct CategoryToggleRow: View {
         appState.selectedCountInCategory(result.category) == result.itemCount
     }
 
+    @State private var hovering = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
     var body: some View {
-        Toggle(isOn: Binding(
-            get: { isFullySelected },
-            set: { newValue in
-                if newValue {
-                    appState.selectAllInCategory(result.category)
-                } else {
-                    appState.deselectAllInCategory(result.category)
+        HStack(spacing: 12) {
+            // Checkbox stays its own hit target so ticking a category doesn't
+            // navigate, and clicking the row body doesn't toggle selection.
+            Toggle("", isOn: Binding(
+                get: { isFullySelected },
+                set: { newValue in
+                    if newValue {
+                        appState.selectAllInCategory(result.category)
+                    } else {
+                        appState.deselectAllInCategory(result.category)
+                    }
                 }
-            }
-        )) {
-            HStack(spacing: 12) {
-                IconTile(systemName: result.category.icon, tint: result.category.color, size: 28)
-                VStack(alignment: .leading, spacing: 1) {
-                    Text(LocalizedStringKey(result.category.rawValue))
-                        .font(.system(size: 13.5, weight: .semibold))
-                    Text(itemsCountText)
-                        .font(.system(size: 11.5))
+            ))
+            .toggleStyle(.checkbox)
+            .labelsHidden()
+            .help("Select all in this category")
+
+            // The rest of the row navigates to the category's detail view
+            // (fixes: dashboard results weren't clickable — issue #2).
+            Button {
+                appState.requestedSection = .cleaning(result.category)
+            } label: {
+                HStack(spacing: 12) {
+                    IconTile(systemName: result.category.icon, tint: result.category.color, size: 28)
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text(LocalizedStringKey(result.category.rawValue))
+                            .font(.system(size: 13.5, weight: .semibold))
+                        Text(itemsCountText)
+                            .font(.system(size: 11.5))
+                            .foregroundStyle(.secondary)
+                    }
+                    Spacer()
+                    Text(result.formattedSize)
+                        .font(.system(size: 13, weight: .semibold))
+                        .monospacedDigit()
                         .foregroundStyle(.secondary)
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(.tertiary)
+                        .opacity(hovering ? 1 : 0.5)
                 }
-                Spacer()
-                Text(result.formattedSize)
-                    .font(.system(size: 13, weight: .semibold))
-                    .monospacedDigit()
-                    .foregroundStyle(.secondary)
+                .contentShape(Rectangle())
             }
+            .buttonStyle(.plain)
         }
-        .toggleStyle(.checkbox)
         .padding(.horizontal, 16)
         .padding(.vertical, 10)
+        .background(
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .fill(Color.primary.opacity(hovering ? 0.04 : 0))
+                .padding(.horizontal, 6)
+        )
+        .animation(reduceMotion ? nil : MotionTokens.snappy, value: hovering)
+        .onHover { hovering = $0 }
     }
 
     private var itemsCountText: String {

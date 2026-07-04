@@ -37,6 +37,12 @@ struct MainWindow: View {
             selectedSection = .apps
             appState.pendingExternalApp = nil
         }
+        .onChange(of: appState.requestedSection) { section in
+            // A dashboard result was clicked — jump to that section.
+            guard let section else { return }
+            selectedSection = section
+            appState.requestedSection = nil
+        }
         .onAppear {
             // Covers a request that landed before MainWindow mounted (cold
             // launch, or while onboarding was still showing) — onChange alone
@@ -44,6 +50,10 @@ struct MainWindow: View {
             if appState.pendingExternalApp != nil {
                 selectedSection = .apps
                 appState.pendingExternalApp = nil
+            }
+            if let section = appState.requestedSection {
+                selectedSection = section
+                appState.requestedSection = nil
             }
             consumeMenuBarSmartScanRequest()
         }
