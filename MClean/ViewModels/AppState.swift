@@ -828,16 +828,27 @@ final class AppState: ObservableObject {
         // scanState now changes only on real transitions (idle → scanning →
         // completed); per-tick progress lives on `activity` so the whole
         // AppState-observing view tree isn't invalidated on every update.
+        //
+        // Scan order matters for BOTH wall-clock and perceived speed. The one
+        // heavy job that walks the whole Home tree (Large & Old Files) goes
+        // first so it runs concurrently the entire time instead of starting
+        // late; the rest are ordered light→heavy so the many quick/empty
+        // categories complete early and the progress bar climbs immediately
+        // (the parallel rewrite in an earlier build updated progress only on
+        // completion AND started the heavy job 6th, so the bar sat at 0% for
+        // many seconds — that read as "much slower" even when it wasn't).
+        let categories = AppState.smartScanOrder
         scanState = .scanning(progress: 0, currentCategory: "")
         categoryResults = [:]
         totalJunkSize = 0
         activity.scanProgress = 0
+        activity.currentCategory = categories.first?.rawValue ?? ""
         clearSelectionState()
 
         Task {
-            let categories = CleaningCategory.scannable
             let total = categories.count
             var completed = 0
+            var nextIndex = 0
 
             let onPath: @Sendable (String) -> Void = { [weak self] path in
                 Task { @MainActor [weak self] in
@@ -848,19 +859,19 @@ final class AppState: ObservableObject {
             // Categories are independent, so run them concurrently. Each task
             // gets its OWN ScanEngine instance: the engine is an actor whose
             // path-reporter state would serialize (and race) concurrent scans
-            // on a shared instance. In-flight is capped so disk-walk
-            // categories don't thrash the drive while Process-spawning ones
-            // (brew/node/docker) wait on their subprocesses.
+            // on a shared instance. Cap kept modest so several disk-walk
+            // categories don't thrash the drive against each other.
             await withTaskGroup(of: (CleaningCategory, CategoryResult).self) { group in
-                var pending = categories.makeIterator()
                 var inFlight = 0
-                let cap = 4
+                let cap = 3
 
                 // Nested funcs don't inherit the surrounding MainActor
-                // isolation, so submitNext touches no UI state — the label
-                // updates happen in the (isolated) while-loop below instead.
+                // isolation, so submitNext must not touch UI state — all
+                // `activity` updates happen in the isolated while-loop below.
                 func submitNext() {
-                    guard let category = pending.next() else { return }
+                    guard nextIndex < categories.count else { return }
+                    let category = categories[nextIndex]
+                    nextIndex += 1
                     inFlight += 1
                     group.addTask {
                         let engine = ScanEngine()
@@ -875,8 +886,15 @@ final class AppState: ObservableObject {
                     completed += 1
                     categoryResults[category] = result
                     totalJunkSize += result.totalSize
-                    activity.scanProgress = Double(completed) / Double(total)
-                    activity.currentCategory = category.rawValue
+                    // Blend in the in-flight work so the bar reflects progress
+                    // that's underway, not just finished categories — the bar
+                    // moves smoothly instead of jumping on each completion.
+                    activity.scanProgress = min(1, (Double(completed) + Double(inFlight) * 0.5) / Double(total))
+                    // Label the next category about to run (or keep the last
+                    // one while the final heavy job finishes).
+                    if nextIndex < categories.count {
+                        activity.currentCategory = categories[nextIndex].rawValue
+                    }
                     submitNext()
                 }
             }
@@ -886,6 +904,27 @@ final class AppState: ObservableObject {
             scanState = .completed
             loadDiskInfo()
         }
+    }
+
+    /// Smart Scan execution order. The single heaviest walker (Large & Old
+    /// Files scans all of Home) leads so it overlaps everything; the rest run
+    /// light→heavy so quick/empty categories finish first and drive early
+    /// progress. Falls back to append any scannable category not listed here,
+    /// so adding a new category can never silently drop it from Smart Scan.
+    static var smartScanOrder: [CleaningCategory] {
+        let preferred: [CleaningCategory] = [
+            .largeFiles,                          // heaviest — start immediately
+            .mailAttachments, .trashBins,         // usually tiny/empty
+            .brewCache, .nodeCache, .dockerCache, // CLI probes, fast when absent
+            .aiApps,
+            .systemJunk, .xcodeJunk, .userCache,  // heavier disk walks
+        ]
+        let scannable = Set(CleaningCategory.scannable)
+        var order = preferred.filter { scannable.contains($0) }
+        for category in CleaningCategory.scannable where !order.contains(category) {
+            order.append(category)
+        }
+        return order
     }
 
     func scanSingleCategory(_ category: CleaningCategory) {
