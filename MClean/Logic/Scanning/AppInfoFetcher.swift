@@ -133,6 +133,38 @@ final class AppInfoFetcher {
     }
 
     private func appSize(at url: URL) -> Int64 {
-        FileSizeCalculator.size(of: url) ?? 0
+        // Sizing a bundle means enumerating every file inside it. That is
+        // brutal for huge apps — Xcode.app alone is hundreds of thousands of
+        // files — and this runs for EVERY app on EVERY launch, hammering the
+        // disk for minutes and starving any scan the user starts meanwhile
+        // (field report: Smart Scan "stuck for 3+ minutes" right after
+        // launch, on a machine where the scan itself benches in seconds).
+        //
+        // Cache the size keyed by the bundle's root modification date: app
+        // updates replace the bundle and bump that date, invalidating the
+        // entry; unchanged apps cost two stat calls instead of a full walk.
+        let modDate = (try? url.resourceValues(forKeys: [.contentModificationDateKey]))?
+            .contentModificationDate?.timeIntervalSince1970 ?? 0
+
+        let cache = UserDefaults.standard.dictionary(forKey: Self.sizeCacheKey) as? [String: [String: Double]] ?? [:]
+        if let entry = cache[url.path],
+           entry["mtime"] == modDate,
+           let cached = entry["size"] {
+            return Int64(cached)
+        }
+
+        let size = FileSizeCalculator.size(of: url) ?? 0
+
+        var updated = cache
+        updated[url.path] = ["mtime": modDate, "size": Double(size)]
+        // Drop entries for apps that no longer exist so the cache can't grow
+        // without bound across years of installs/uninstalls.
+        if updated.count > 400 {
+            updated = updated.filter { FileManager.default.fileExists(atPath: $0.key) }
+        }
+        UserDefaults.standard.set(updated, forKey: Self.sizeCacheKey)
+        return size
     }
+
+    private static let sizeCacheKey = "MClean.AppSizeCache.v1"
 }

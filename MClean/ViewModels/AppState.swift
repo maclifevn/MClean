@@ -213,7 +213,10 @@ final class AppState: ObservableObject {
     func loadInstalledApps() {
         isLoadingApps = true
         Task.detached(priority: .userInitiated) {
+            let start = Date()
             let apps = AppInfoFetcher.shared.fetchInstalledApps()
+            let elapsed = String(format: "%.2f", Date().timeIntervalSince(start))
+            Logger.shared.log("Installed apps loaded: \(apps.count) in \(elapsed)s")
             await MainActor.run { [weak self] in
                 self?.installedApps = apps
                 self?.isLoadingApps = false
@@ -874,11 +877,20 @@ final class AppState: ObservableObject {
                     nextIndex += 1
                     inFlight += 1
                     group.addTask {
+                        // Wall-clock per category in the REAL app path (visible
+                        // via Console/log show, subsystem com.maclife.mclean).
+                        // Field reports say scans stall for minutes even though
+                        // the engine benches in seconds; this pinpoints where.
+                        let start = Date()
+                        Logger.shared.log("SmartScan start: \(category.rawValue)")
                         let engine = ScanEngine()
                         let result = await engine.scanCategory(category, onPath: onPath)
+                        let elapsed = String(format: "%.2f", Date().timeIntervalSince(start))
+                        Logger.shared.log("SmartScan done: \(category.rawValue) in \(elapsed)s, \(result.itemCount) items")
                         return (category, result)
                     }
                 }
+                let scanStart = Date()
                 for _ in 0..<cap { submitNext() }
                 while inFlight > 0 {
                     guard let (category, result) = await group.next() else { break }
@@ -886,10 +898,12 @@ final class AppState: ObservableObject {
                     completed += 1
                     categoryResults[category] = result
                     totalJunkSize += result.totalSize
-                    // Blend in the in-flight work so the bar reflects progress
-                    // that's underway, not just finished categories — the bar
-                    // moves smoothly instead of jumping on each completion.
-                    activity.scanProgress = min(1, (Double(completed) + Double(inFlight) * 0.5) / Double(total))
+                    // Honest progress: completed/total only. An earlier build
+                    // blended half-credit for in-flight work, which shot the
+                    // ring to ~50% while the quick categories finished and
+                    // then froze it there for the whole heavy tail — reading
+                    // as a stall even when work was progressing.
+                    activity.scanProgress = Double(completed) / Double(total)
                     // Label the next category about to run (or keep the last
                     // one while the final heavy job finishes).
                     if nextIndex < categories.count {
@@ -897,6 +911,8 @@ final class AppState: ObservableObject {
                     }
                     submitNext()
                 }
+                let totalElapsed = String(format: "%.2f", Date().timeIntervalSince(scanStart))
+                Logger.shared.log("SmartScan total: \(totalElapsed)s")
             }
 
             activity.scanProgress = 1.0
