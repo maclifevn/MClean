@@ -35,6 +35,14 @@ struct AppListView: View {
             fileDetail
                 .frame(minWidth: 380, maxWidth: .infinity)
         }
+        .task {
+            // Lazy first load: installed apps are no longer walked at launch
+            // (that starved cold-boot Smart Scans of disk). Load them the
+            // first time the uninstaller is actually opened.
+            if appState.installedApps.isEmpty && !appState.isLoadingApps {
+                appState.loadInstalledApps()
+            }
+        }
         .searchable(text: $searchText, prompt: "Search apps")
         .navigationTitle(installedAppsTitle)
         .toolbar {

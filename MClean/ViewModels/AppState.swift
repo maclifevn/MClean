@@ -194,7 +194,12 @@ final class AppState: ObservableObject {
         if performStartupTasks {
             loadDiskInfo()
             checkFullDiskAccess()
-            loadInstalledApps()
+            // Installed apps are loaded lazily when the App Uninstaller is
+            // first opened — NOT at launch. Sizing every bundle walks huge
+            // apps (Xcode is ~400k files / several GB); doing it eagerly on
+            // every launch starved a Smart Scan started right after opening
+            // the app of disk I/O, which read as a multi-minute scan stall on
+            // cold-boot first runs.
             scheduler.setTrigger { [weak self] in
                 await self?.runScheduledScan()
             }
@@ -210,9 +215,13 @@ final class AppState: ObservableObject {
 
     // MARK: - App Loading
 
+    /// Load the installed-app list on demand. Idempotent-ish: callers guard on
+    /// `installedApps.isEmpty && !isLoadingApps` so opening the uninstaller
+    /// repeatedly doesn't re-walk. Runs at `.utility` QoS so it always yields
+    /// disk to a user-initiated Smart Scan running at the same time.
     func loadInstalledApps() {
         isLoadingApps = true
-        Task.detached(priority: .userInitiated) {
+        Task.detached(priority: .utility) {
             let start = Date()
             let apps = AppInfoFetcher.shared.fetchInstalledApps()
             let elapsed = String(format: "%.2f", Date().timeIntervalSince(start))
@@ -540,7 +549,19 @@ final class AppState: ObservableObject {
         orphanedFiles = []
         Task.detached(priority: .userInitiated) {
             let locations = Locations()
-            let knownApps = await MainActor.run { self.installedApps }
+            // The installed-app list is loaded lazily (not at launch), so it
+            // may be empty here if the user runs Orphan Finder before opening
+            // the App Uninstaller. Loading it is MANDATORY for correctness:
+            // with an empty known-apps set, every leftover would match nothing
+            // and be flagged as orphaned — a dangerous false positive. Fetch
+            // it synchronously (cheap after the size cache warms) and seed the
+            // shared list so the UI benefits too.
+            var knownApps = await MainActor.run { self.installedApps }
+            if knownApps.isEmpty {
+                knownApps = AppInfoFetcher.shared.fetchInstalledApps()
+                let loaded = knownApps
+                await MainActor.run { self.installedApps = loaded }
+            }
             let knownIDs = Set(knownApps.map { $0.bundleIdentifier.normalizedForMatching() })
             let knownNames = Set(knownApps.map { $0.appName.normalizedForMatching() })
             // Paths the user marked "Always Ignore" (issue #114). These were
