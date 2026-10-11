@@ -17,6 +17,8 @@ import SwiftUI
 final class SpaceLensScanProgress: ObservableObject {
     @Published var bytes: Int64 = 0
     @Published var items: Int = 0
+    @Published var inaccessibleCount = 0
+    @Published var skippedCount = 0
 }
 
 @MainActor
@@ -28,6 +30,30 @@ final class SpaceLensViewModel: ObservableObject {
         case trashing
     }
 
+    enum DisplayMode: String, CaseIterable, Identifiable {
+        case map, list, combined
+        var id: String { rawValue }
+        var title: LocalizedStringKey {
+            switch self {
+            case .map: return "Map"
+            case .list: return "List"
+            case .combined: return "Combined"
+            }
+        }
+    }
+
+    enum SortOrder: String, CaseIterable, Identifiable {
+        case size, name
+        var id: String { rawValue }
+        var title: LocalizedStringKey { self == .size ? "Size" : "Name" }
+    }
+
+    @Published var displayMode: DisplayMode {
+        didSet { preferences.set(displayMode.rawValue, forKey: "MClean.SpaceLens.DisplayMode") }
+    }
+    @Published var sortOrder: SortOrder = .size
+    @Published private(set) var includesSmallFiles = false
+    @Published private(set) var scanningURL: URL?
     @Published var state: LensState = .empty
     @Published var rootNode: SpaceLensNode?
     /// Breadcrumb trail below the root; the displayed node is `path.last`,
@@ -38,11 +64,32 @@ final class SpaceLensViewModel: ObservableObject {
     let ticker = ScanProgressTicker()
     let progress = SpaceLensScanProgress()
 
-    private let engine = SpaceLensEngine()
-    private let cleaningEngine = CleaningEngine()
+    typealias ScanHandler = @Sendable (URL, Int64, @escaping @Sendable (SpaceLensEngine.Progress) -> Void) async throws -> SpaceLensNode
+    private let scanHandler: ScanHandler
+    private let cleaningEngine: CleaningEngine
+    private let preferences: UserDefaults
+
+    init(preferences: UserDefaults = .standard, cleaningEngine: CleaningEngine = CleaningEngine(), scanHandler: ScanHandler? = nil) {
+        self.preferences = preferences
+        self.cleaningEngine = cleaningEngine
+        displayMode = DisplayMode(rawValue: preferences.string(forKey: "MClean.SpaceLens.DisplayMode") ?? "") ?? .combined
+        let engine = SpaceLensEngine()
+        self.scanHandler = scanHandler ?? { url, minimum, progress in
+            try await engine.scan(root: url, minNodeSize: minimum, onProgress: progress)
+        }
+    }
+    private var scanGeneration = UUID()
     private var scanTask: Task<Void, Never>?
 
     var currentNode: SpaceLensNode? { path.last ?? rootNode }
+
+    var canGoBack: Bool { !path.isEmpty && state == .ready }
+
+    var visibleChildren: [SpaceLensNode] {
+        let children = currentNode?.children ?? []
+        guard sortOrder == .name else { return children }
+        return children.sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
+    }
 
     var selectedNodes: [SpaceLensNode] {
         currentNode?.children.filter { selection.contains($0.id) } ?? []
@@ -60,6 +107,10 @@ final class SpaceLensViewModel: ObservableObject {
         panel.canChooseFiles = false
         panel.allowsMultipleSelection = false
         panel.directoryURL = FileManager.default.homeDirectoryForCurrentUser
+        panel.title = String(localized: "Choose a folder to inspect")
+        panel.message = String(localized: "Scan locally, then review items before moving them to the Trash.")
+        panel.canCreateDirectories = false
+        panel.treatsFilePackagesAsDirectories = false
         panel.prompt = String(localized: "Scan")
         guard panel.runModal() == .OK, let url = panel.url else { return }
         scan(url)
@@ -70,58 +121,92 @@ final class SpaceLensViewModel: ObservableObject {
     }
 
     func scan(_ url: URL) {
+        startScan(url, includeSmallFiles: false, restorePath: [])
+    }
+
+    func rescan() {
+        guard let rootNode, state == .ready else { return }
+        startScan(rootNode.url, includeSmallFiles: includesSmallFiles, restorePath: path.map(\.url))
+    }
+
+    func showSmallerItems() {
+        guard let rootNode, state == .ready, !includesSmallFiles else { return }
+        startScan(rootNode.url, includeSmallFiles: true, restorePath: path.map(\.url))
+    }
+
+    private func startScan(_ url: URL, includeSmallFiles: Bool, restorePath: [URL]) {
+        guard state != .trashing else { return }
         scanTask?.cancel()
         state = .scanning
-        rootNode = nil
-        path = []
+        scanningURL = url
         selection = []
         progress.bytes = 0
         progress.items = 0
+        progress.inaccessibleCount = 0
+        progress.skippedCount = 0
         lastError = nil
         ticker.path = ""
 
+        let generation = UUID()
+        scanGeneration = generation
         scanTask = Task { [weak self] in
             guard let self else { return }
             do {
-                let root = try await self.engine.scan(root: url) { update in
+                let root = try await self.scanHandler(url, includeSmallFiles ? 0 : 1_048_576) { [weak self] update in
                     Task { @MainActor [weak self] in
-                        guard let self, self.state == .scanning else { return }
+                        guard let self, self.scanGeneration == generation, self.state == .scanning else { return }
                         self.progress.bytes = update.scannedBytes
                         self.progress.items = update.itemCount
-                        if !update.currentPath.isEmpty {
-                            self.ticker.path = update.currentPath
-                        }
+                        self.progress.inaccessibleCount = update.inaccessibleCount
+                        self.progress.skippedCount = update.skippedCount
+                        if !update.currentPath.isEmpty { self.ticker.path = update.currentPath }
                     }
                 }
-                guard !Task.isCancelled else { return }
+                guard !Task.isCancelled, self.scanGeneration == generation else { return }
                 self.rootNode = root
+                self.path = []
+                var current = root
+                for url in restorePath {
+                    guard let child = current.children.first(where: { $0.url == url && $0.isDirectory && !$0.isPackage }) else { break }
+                    self.path.append(child)
+                    current = child
+                }
+                self.includesSmallFiles = includeSmallFiles
+                self.scanningURL = nil
                 self.state = .ready
                 Haptics.success()
             } catch is CancellationError {
-                // Cancelled scans fall back to whatever state cancelScan set.
+                // cancelScan restores the previous completed tree.
             } catch {
+                guard self.scanGeneration == generation else { return }
                 self.lastError = error.localizedDescription
-                self.state = .empty
+                self.scanningURL = nil
+                self.state = self.rootNode == nil ? .empty : .ready
             }
         }
     }
 
     func cancelScan() {
+        guard state == .scanning else { return }
+        scanGeneration = UUID()
         scanTask?.cancel()
         scanTask = nil
+        scanningURL = nil
         state = rootNode == nil ? .empty : .ready
     }
 
     // MARK: - Navigation
 
     func drill(into node: SpaceLensNode) {
-        guard node.isDirectory, !node.isPackage else { return }
+        guard state == .ready, node.isDirectory, !node.isPackage,
+              currentNode?.children.contains(where: { $0.id == node.id }) == true else { return }
         path.append(node)
         selection = []
     }
 
     /// Pop back to `node`; nil pops all the way to the scan root.
     func pop(to node: SpaceLensNode?) {
+        guard state == .ready else { return }
         if let node, let index = path.firstIndex(where: { $0.id == node.id }) {
             path.removeSubrange(path.index(after: index)...)
         } else {
@@ -130,12 +215,33 @@ final class SpaceLensViewModel: ObservableObject {
         selection = []
     }
 
+    func goBack() {
+        guard canGoBack else { return }
+        path.removeLast()
+        selection = []
+    }
+
+    func toggleSelection(_ node: SpaceLensNode) {
+        guard state == .ready, currentNode?.children.contains(where: { $0.id == node.id }) == true else { return }
+        if selection.contains(node.id) { selection.remove(node.id) }
+        else { selection.insert(node.id) }
+    }
+
+    func reveal(_ url: URL) {
+        NSWorkspace.shared.activateFileViewerSelecting([url])
+    }
+
     // MARK: - Deletion
 
     func trashSelection() async {
-        guard let parent = currentNode else { return }
-        let nodes = selectedNodes
-        guard !nodes.isEmpty else { return }
+        await trash(selectedNodes)
+    }
+
+    /// The confirmation passes a frozen batch. Navigation cannot substitute
+    /// other selected items while that confirmation is open.
+    func trash(_ nodes: [SpaceLensNode]) async {
+        guard state == .ready, let parent = currentNode, !nodes.isEmpty,
+              nodes.allSatisfy({ node in parent.children.contains { $0.id == node.id } }) else { return }
 
         state = .trashing
         let result = await cleaningEngine.trashItems(nodes.map { ($0.url, $0.size) })

@@ -35,6 +35,7 @@ enum OrphanSafetyPolicy {
     ]
 
     static func isSafeCandidate(_ url: URL) -> Bool {
+        guard !ProviderPaths.isProviderOwned(url.path) else { return false }
         let path = normalizedPath(url)
         let lowerPath = path.lowercased()
 
@@ -67,6 +68,18 @@ enum OrphanSafetyPolicy {
         }
 
         return true
+    }
+
+    /// Whether enumerating this directory can possibly produce a candidate.
+    /// Reverse-search locations include Preferences, Containers and other
+    /// intentionally blocked trees; skipping them avoids pointless I/O and
+    /// prevents future policy changes from accidentally broadening a scan.
+    static func shouldScanDirectory(_ url: URL) -> Bool {
+        let path = normalizedPath(url).lowercased()
+        return allowedRoots.contains { root in
+            let normalizedRoot = root.lowercased()
+            return path == normalizedRoot || path.hasPrefix(normalizedRoot + "/")
+        }
     }
 
     private static func normalizedPath(_ url: URL) -> String {

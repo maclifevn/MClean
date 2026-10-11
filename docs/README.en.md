@@ -74,7 +74,7 @@ Optional. Configurable interval with an auto-clean threshold.
 
 ## Our promise
 
-- **Trash, never `rm`.** Everything goes to the Trash via `FileManager.trashItem`.
+- **Recoverable ordinary-file cleanup.** Ordinary files go to the Trash via `FileManager.trashItem`; Trash emptying, simulator-runtime removal, Docker prune and Time Machine snapshot deletion are permanent actions.
 - **No telemetry, ever.** No analytics, no crash reporting, no network calls to us.
 - **No fake urgency.** Neutral facts, no fear-based scans.
 - **You review before anything is removed.** Every item shows its real path.
@@ -82,11 +82,11 @@ Optional. Configurable interval with an auto-clean threshold.
 
 ## Permissions
 
-MClean needs **Full Disk Access** to read locations macOS hides from every app by default — Mail downloads, Safari data, the TCC database, protected app containers. Without it, cleanup misses roughly 70% of what it could find. First-launch onboarding walks you through granting it. MClean collects no telemetry, needs no network connection, and moves data nowhere except the Trash.
+MClean needs **Full Disk Access** to read locations macOS hides from every app by default — Mail downloads, Safari data, the TCC database, protected app containers. Without it, some protected locations are unavailable; the impact depends on the data on your Mac. First-launch onboarding walks you through granting it. MClean collects no telemetry, keeps scans local. GitHub release checks and Homebrew updates use the network; emptying Trash and managed cleanup actions can permanently remove data.
 
 ## Security
 
-- Symlink attack prevention: paths resolved before validation, re-resolved immediately before unlink (closes TOCTOU windows).
+- Symlink attack prevention: paths resolved before validation, re-resolved immediately before unlink (narrows the race window).
 - Allow-list cleaning: a path outside an explicit safe-root is refused.
 - System app protection: Apple's bundles cannot be uninstalled.
 - All destructive operations require explicit confirmation by default.
@@ -100,3 +100,5 @@ Pull requests welcome. See [CONTRIBUTING.md](../CONTRIBUTING.md).
 ## License
 
 MIT. See [LICENSE](../LICENSE).
+
+Functional updates from PureMac 3.1.0 are integrated while preserving the existing MClean interface. See [the synchronization report](UPSTREAM-SYNC.md) for features and validation.

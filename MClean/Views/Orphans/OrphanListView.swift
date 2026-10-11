@@ -5,6 +5,7 @@ struct OrphanListView: View {
     @State private var selectedOrphans: Set<URL> = []
     @State private var isRemoving = false
     @State private var removalErrorMessage: String?
+    @State private var pendingTrashURLs: Set<URL>?
     /// Orphan sizes computed off the main thread. Orphans are exactly the large
     /// leftovers (multi-GB Caches/Containers/Application Support), and their
     /// size is a recursive directory walk — calling it from `body` would re-walk
@@ -12,6 +13,8 @@ struct OrphanListView: View {
     /// once off-main per result set and rows read the cached value.
     @State private var sizeCache: [URL: Int64] = [:]
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @AppStorage("settings.general.confirmBeforeDelete") private var confirmBeforeDelete = true
+    private let cleaningEngine = CleaningEngine()
 
     var body: some View {
         Group {
@@ -40,7 +43,14 @@ struct OrphanListView: View {
                                 NSPasteboard.general.setString(fileURL.path, forType: .string)
                             },
                             onIgnore: { ignoreOrphans([fileURL]) },
-                            onTrash: { Task { await removeSingleOrphan(fileURL) } }
+                            onTrash: {
+                                let urls = Set([fileURL])
+                                if confirmBeforeDelete {
+                                    pendingTrashURLs = urls
+                                } else {
+                                    Task { await removeOrphans(urls) }
+                                }
+                            }
                         )
                         .transition(
                             reduceMotion
@@ -61,13 +71,20 @@ struct OrphanListView: View {
             // with no main-actor isolation, so it runs safely on a detached
             // background task; the result is applied back on the main actor.
             let urls = appState.orphanedFiles
-            let sizes = await Task.detached(priority: .utility) { () -> [URL: Int64] in
+            let worker = Task.detached(priority: .utility) { () -> [URL: Int64] in
                 var out: [URL: Int64] = [:]
                 for url in urls {
+                    guard !Task.isCancelled else { break }
                     out[url] = FileSizeCalculator.size(of: url) ?? 0
                 }
                 return out
-            }.value
+            }
+            let sizes = await withTaskCancellationHandler {
+                await worker.value
+            } onCancel: {
+                worker.cancel()
+            }
+            guard !Task.isCancelled, appState.orphanedFiles == urls else { return }
             sizeCache = sizes
         }
         .toolbar {
@@ -93,8 +110,10 @@ struct OrphanListView: View {
                     .disabled(isRemoving)
 
                     Button(removeSelectedLabel, role: .destructive) {
-                        Task {
-                            await removeSelectedOrphans()
+                        if confirmBeforeDelete {
+                            pendingTrashURLs = selectedOrphans
+                        } else {
+                            Task { await removeOrphans(selectedOrphans) }
                         }
                     }
                     .buttonStyle(.borderedProminent)
@@ -102,6 +121,26 @@ struct OrphanListView: View {
                     .disabled(isRemoving)
                 }
             }
+        }
+        .confirmationDialog(
+            String(
+                format: String(localized: "Move %lld files to the Trash?"),
+                Int64(pendingTrashURLs?.count ?? 0)
+            ),
+            isPresented: Binding(
+                get: { pendingTrashURLs != nil },
+                set: { if !$0 { pendingTrashURLs = nil } }
+            ),
+            titleVisibility: .visible
+        ) {
+            Button("Move to Trash", role: .destructive) {
+                let urls = pendingTrashURLs ?? []
+                pendingTrashURLs = nil
+                Task { await removeOrphans(urls) }
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("Items can be restored from the Trash.")
         }
         .alert("Some files could not be removed", isPresented: Binding(
             get: { removalErrorMessage != nil },
@@ -145,44 +184,25 @@ struct OrphanListView: View {
         )
     }
 
-    private func removeSelectedOrphans() async {
+    private func removeOrphans(_ urlsToRemove: Set<URL>) async {
+        guard !urlsToRemove.isEmpty else { return }
         isRemoving = true
         defer { isRemoving = false }
 
-        let urlsToRemove = selectedOrphans
         var failedPaths: [String] = []
-        var removedURLs: Set<URL> = []
-        var needsAdminURLs: [URL] = []
-
-        for url in urlsToRemove {
+        let safeURLs = urlsToRemove.filter { url in
             guard OrphanSafetyPolicy.isSafeCandidate(url) else {
                 failedPaths.append("\(url.path) (blocked by safety policy)")
-                continue
+                return false
             }
-
-            switch removeOrphan(url) {
-            case .removed:
-                removedURLs.insert(url)
-            case .needsAdmin:
-                needsAdminURLs.append(url)
-            case .failed:
-                failedPaths.append(url.path)
-            }
+            return true
         }
-
-        if !needsAdminURLs.isEmpty {
-            if removeWithAdminPrivileges(needsAdminURLs) {
-                for url in needsAdminURLs {
-                    if !FileManager.default.fileExists(atPath: url.path) {
-                        removedURLs.insert(url)
-                    } else {
-                        failedPaths.append(url.path)
-                    }
-                }
-            } else {
-                failedPaths.append(contentsOf: needsAdminURLs.map(\.path))
-            }
+        let items = safeURLs.map { url in
+            (url: url, size: sizeCache[url] ?? 0)
         }
+        let result = await cleaningEngine.trashItems(items)
+        let removedURLs = Set(safeURLs.filter { result.trashedPaths.contains($0.path) })
+        failedPaths.append(contentsOf: result.errors)
 
         // Sweep removed rows out (per-row transitions are attached in the
         // List above); plain assignment under Reduce Motion.
@@ -198,35 +218,7 @@ struct OrphanListView: View {
         if !failedPaths.isEmpty {
             let preview = failedPaths.prefix(3).joined(separator: "\n")
             let suffix = failedPaths.count > 3 ? "\n…" : ""
-            removalErrorMessage = "\(failedPaths.count) item(s) failed to delete.\n\n\(preview)\(suffix)"
-        }
-    }
-
-    private enum OrphanRemoveOutcome {
-        case removed
-        case needsAdmin
-        case failed
-    }
-
-    private func removeOrphan(_ url: URL) -> OrphanRemoveOutcome {
-        do {
-            try FileManager.default.removeItem(at: url)
-            return .removed
-        } catch {
-            let nsError = error as NSError
-            let permissionDeniedCodes = [
-                NSFileReadNoPermissionError,
-                NSFileWriteNoPermissionError,
-                NSFileWriteUnknownError,
-                257,
-                513,
-            ]
-
-            guard permissionDeniedCodes.contains(nsError.code) else {
-                return .failed
-            }
-
-            return .needsAdmin
+            removalErrorMessage = "\(failedPaths.count) item(s) could not be moved to the Trash.\n\n\(preview)\(suffix)"
         }
     }
 
@@ -248,42 +240,6 @@ struct OrphanListView: View {
         }
     }
 
-    private func removeSingleOrphan(_ url: URL) async {
-        let previous = selectedOrphans
-        selectedOrphans = [url]
-        await removeSelectedOrphans()
-        selectedOrphans = previous.subtracting([url])
-    }
-
-    private func removeWithAdminPrivileges(_ urls: [URL]) -> Bool {
-        guard !urls.isEmpty else { return true }
-        guard urls.allSatisfy({ OrphanSafetyPolicy.isSafeCandidate($0) }) else { return false }
-
-        // Quote path for a POSIX shell command.
-        let quotedPaths = urls.map { url in
-            "'\(url.path.replacingOccurrences(of: "'", with: "'\\\"'\\\"'"))'"
-        }
-        let shellCommand = "rm -rf -- \(quotedPaths.joined(separator: " "))"
-        let appleScriptCommand = shellCommand
-            .replacingOccurrences(of: "\\", with: "\\\\")
-            .replacingOccurrences(of: "\"", with: "\\\"")
-        let script = "do shell script \"\(appleScriptCommand)\" with administrator privileges"
-
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: "/usr/bin/osascript")
-        process.arguments = ["-e", script]
-
-        do {
-            try process.run()
-            process.waitUntilExit()
-            if process.terminationStatus != 0 {
-                return false
-            }
-            return true
-        } catch {
-            return false
-        }
-    }
 }
 
 // MARK: - Row

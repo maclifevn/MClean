@@ -24,6 +24,20 @@
 	<string>public.app-category.utilities</string>
 	<key>NSHumanReadableCopyright</key>
 	<string>Copyright 2026. MIT License.</string>
+	<key>SUFeedURL</key>
+	<string>https://github.com/maclifevn/MClean/releases/download/appcast/appcast.xml</string>
+	<key>SUPublicEDKey</key>
+	<string>uG9oyQv95UqnmgJdLQsaHjHwphJ65HvcbGbAhIluoy0=</string>
+	<key>SURequireSignedFeed</key>
+	<true/>
+	<key>SUSignedFeedFailureExpirationInterval</key>
+	<integer>0</integer>
+	<key>SUVerifyUpdateBeforeExtraction</key>
+	<true/>
+	<key>SUAllowsAutomaticUpdates</key>
+	<true/>
+	<key>SUScheduledCheckInterval</key>
+	<integer>86400</integer>
 	<key>NSDesktopFolderUsageDescription</key>
 	<string>MClean needs access to your Desktop to find junk and orphaned files.</string>
 	<key>NSDocumentsFolderUsageDescription</key>
@@ -32,8 +46,6 @@
 	<string>MClean needs access to your Downloads to find junk and orphaned files.</string>
 	<key>NSRemovableVolumesUsageDescription</key>
 	<string>MClean needs access to removable volumes to scan for junk files.</string>
-	<key>NSSystemAdministrationUsageDescription</key>
-	<string>MClean needs system administration access to clean caches and uninstall apps completely.</string>
 	<key>NSAppleEventsUsageDescription</key>
 	<string>MClean uses Apple Events to interact with Finder when revealing files.</string>
 	<key>NSServices</key>

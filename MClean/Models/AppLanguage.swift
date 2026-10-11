@@ -8,6 +8,16 @@ enum AppLanguage: String, CaseIterable, Identifiable {
     case traditionalChinese = "zh-Hant"
     case vietnamese = "vi"
 
+    case arabic = "ar"
+    case german = "de"
+    case spanish = "es"
+    case french = "fr"
+    case italian = "it"
+    case polish = "pl"
+    case portugueseBrazil = "pt-BR"
+    case russian = "ru"
+    case ukrainian = "uk"
+
     static let preferenceKey = "settings.general.appLanguage"
 
     var id: String { rawValue }
@@ -20,6 +30,15 @@ enum AppLanguage: String, CaseIterable, Identifiable {
         case .simplifiedChinese: return "Chinese (Simplified)"
         case .traditionalChinese: return "Chinese (Traditional)"
         case .vietnamese: return "Vietnamese"
+        case .arabic: return "Arabic"
+        case .german: return "German"
+        case .spanish: return "Spanish"
+        case .french: return "French"
+        case .italian: return "Italian"
+        case .polish: return "Polish"
+        case .portugueseBrazil: return "Portuguese (Brazil)"
+        case .russian: return "Russian"
+        case .ukrainian: return "Ukrainian"
         }
     }
 

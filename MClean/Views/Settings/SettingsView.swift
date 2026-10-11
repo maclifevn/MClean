@@ -3,18 +3,38 @@ import SwiftUI
 import ServiceManagement
 
 struct SettingsView: View {
+    @EnvironmentObject var appState: AppState
+    @State private var selectedTab = "general"
     var body: some View {
-        TabView {
+        TabView(selection: $selectedTab) {
             GeneralSettingsView()
                 .tabItem { Label("General", systemImage: "gear") }
+                .tag("general")
             CleaningSettingsView()
                 .tabItem { Label("Cleaning", systemImage: "trash") }
+                .tag("cleaning")
             ScheduleSettingsView()
                 .tabItem { Label("Schedule", systemImage: "clock") }
+                .tag("schedule")
+            Form {
+                Section("Updates") { AppUpdateSettingsView() }
+            }
+            .formStyle(.grouped)
+            .tabItem { Label("Updates", systemImage: "arrow.down.circle") }
+            .tag("updates")
             AboutSettingsView()
                 .tabItem { Label("About", systemImage: "info.circle") }
+                .tag("about")
         }
         .frame(width: 480, height: 430)
+        .onAppear { showRequestedUpdates() }
+        .onChange(of: appState.showUpdateSettings) { _ in showRequestedUpdates() }
+    }
+    private func showRequestedUpdates() {
+        if appState.showUpdateSettings {
+            selectedTab = "updates"
+            appState.showUpdateSettings = false
+        }
     }
 }
 
@@ -31,7 +51,7 @@ enum SearchSensitivity: String, CaseIterable, Identifiable, Codable {
         switch self {
         case .strict: return "Exact bundle ID and name matches only. Safest option."
         case .enhanced: return "Includes partial name matching and bundle ID components."
-        case .deep: return "Includes company name, entitlements, and team identifier matching."
+        case .deep: return "Includes company-name and broader bundle identifier matching."
         }
     }
 }
@@ -162,16 +182,7 @@ struct GeneralSettingsView: View {
             return
         }
 
-        let task = Process()
-        task.executableURL = URL(fileURLWithPath: "/usr/bin/open")
-        task.arguments = ["-n", Bundle.main.bundleURL.path]
-
-        do {
-            try task.run()
-            NSApp.terminate(nil)
-        } catch {
-            Logger.shared.log("Failed to relaunch MClean: \(error.localizedDescription)", level: .error)
-        }
+        FullDiskAccessManager.shared.relaunchApp()
     }
 }
 
@@ -235,6 +246,26 @@ struct CleaningSettingsView: View {
                 Button("Add Folder…") { addExcludedFolder() }
             }
 
+            Section("Cleanup Exclusions") {
+                Text("Excluded paths and folders containing them stay out of manual and scheduled cleanup. Right-click a cleanup result to exclude it.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                if appState.excludedCleanupPaths.isEmpty {
+                    Text("No excluded paths").foregroundStyle(.secondary)
+                }
+                ForEach(appState.excludedCleanupPaths, id: \.self) { path in
+                    HStack {
+                        Text((path as NSString).abbreviatingWithTildeInPath)
+                            .lineLimit(1)
+                            .truncationMode(.middle)
+                            .help(path)
+                        Spacer()
+                        Button("Remove") { appState.removeCleanupExclusion(path) }
+                            .disabled(appState.scanState.isActive)
+                    }
+                }
+            }
+
             Section("Orphan Finder") {
                 HStack {
                     // Read the live count directly (it's a UserDefaults-backed
@@ -293,17 +324,31 @@ struct ScheduleSettingsView: View {
     var body: some View {
         Form {
             Section("Automatic Scanning") {
-                Toggle("Enable scheduled scanning", isOn: $appState.scheduler.config.isEnabled)
+                Toggle("Enable scheduled scanning", isOn: scheduleEnabledBinding)
 
                 if appState.scheduler.config.isEnabled {
                     Group {
-                        Picker("Scan interval", selection: $appState.scheduler.config.interval) {
+                        Picker("Scan interval", selection: scheduleIntervalBinding) {
                             ForEach(ScheduleInterval.allCases) { interval in
                                 Text(LocalizedStringKey(interval.rawValue)).tag(interval)
                             }
                         }
 
                         Toggle("Auto-clean after scan", isOn: $appState.scheduler.config.autoClean)
+                        if appState.scheduler.config.autoClean {
+                            Stepper(
+                                String(
+                                    format: String(localized: "Minimum cleanup: %lld MB"),
+                                    Int64(minimumCleanSizeMB)
+                                ),
+                                value: minimumCleanSizeBinding,
+                                in: 10...5000,
+                                step: 50
+                            )
+                            Text("Scheduled auto-clean never empties the Trash.")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
                         Toggle("Notify on completion", isOn: $appState.scheduler.config.notifyOnCompletion)
 
                         HStack {
@@ -312,6 +357,15 @@ struct ScheduleSettingsView: View {
                             Text(appState.scheduler.config.formattedLastRun)
                                 .foregroundStyle(.secondary)
                         }
+                        HStack {
+                            Text("Next run")
+                            Spacer()
+                            Text(appState.scheduler.config.formattedNextRun)
+                                .foregroundStyle(.secondary)
+                        }
+                        Text("Scheduled scans run while MClean is open or its menu bar monitor is enabled.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
                     }
                     .transition(.opacity.combined(with: .move(edge: .top)))
                 }
@@ -320,6 +374,31 @@ struct ScheduleSettingsView: View {
         .formStyle(.grouped)
         .animation(reduceMotion ? nil : .spring(response: 0.35, dampingFraction: 0.85),
                    value: appState.scheduler.config.isEnabled)
+    }
+
+    private var scheduleEnabledBinding: Binding<Bool> {
+        Binding(
+            get: { appState.scheduler.config.isEnabled },
+            set: { appState.scheduler.toggleEnabled($0) }
+        )
+    }
+
+    private var scheduleIntervalBinding: Binding<ScheduleInterval> {
+        Binding(
+            get: { appState.scheduler.config.interval },
+            set: { appState.scheduler.updateSchedule(interval: $0) }
+        )
+    }
+
+    private var minimumCleanSizeMB: Int {
+        Int(appState.scheduler.config.minimumCleanSize / 1_048_576)
+    }
+
+    private var minimumCleanSizeBinding: Binding<Int> {
+        Binding(
+            get: { minimumCleanSizeMB },
+            set: { appState.scheduler.config.minimumCleanSize = Int64($0) * 1_048_576 }
+        )
     }
 }
 

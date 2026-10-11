@@ -8,20 +8,20 @@ class SchedulerService: ObservableObject {
     }
 
     private var timer: Timer?
-    private let configKey = "MClean.ScheduleConfig"
+    private let defaults: UserDefaults
+    private let configKey: String
     private var onTrigger: (() async -> Void)?
 
-    init() {
-        if let data = UserDefaults.standard.data(forKey: configKey),
+    init(defaults: UserDefaults = .standard, configKey: String = "MClean.ScheduleConfig") {
+        self.defaults = defaults
+        self.configKey = configKey
+        if let data = defaults.data(forKey: configKey),
            var saved = try? JSONDecoder().decode(ScheduleConfig.self, from: data) {
-            // Refuse to honor an already-past nextRunDate loaded from disk -
-            // otherwise an attacker who can write our plist (same-UID foothold)
-            // sets nextRunDate to a past timestamp and our first tick after
-            // launch triggers autoClean. Reset the schedule so the first run
-            // is always at least one full interval after launch.
-            if let next = saved.nextRunDate, next.timeIntervalSinceNow < 60 {
+            // A missed run is rescheduled from launch instead of firing
+            // immediately. Keep genuinely future dates, even when only a few
+            // seconds away, so relaunching does not postpone the schedule.
+            if let next = saved.nextRunDate, next <= Date() {
                 saved.nextRunDate = nil
-                saved.lastRunDate = nil
             }
             self.config = saved
         } else {
@@ -37,13 +37,19 @@ class SchedulerService: ObservableObject {
         stop()
         guard config.isEnabled else { return }
 
-        updateNextRunDate()
+        if config.nextRunDate == nil || config.nextRunDate! <= Date() {
+            updateNextRunDate(from: Date())
+        }
 
-        timer = Timer.scheduledTimer(withTimeInterval: 60, repeats: true) { [weak self] _ in
+        let delay = max(1, config.nextRunDate?.timeIntervalSinceNow ?? config.interval.seconds)
+        let scheduledTimer = Timer(timeInterval: delay, repeats: false) { [weak self] _ in
             Task { @MainActor [weak self] in
                 self?.checkAndRun()
             }
         }
+        scheduledTimer.tolerance = min(60, max(1, delay * 0.05))
+        RunLoop.main.add(scheduledTimer, forMode: .common)
+        timer = scheduledTimer
     }
 
     func stop() {
@@ -53,7 +59,7 @@ class SchedulerService: ObservableObject {
 
     func updateSchedule(interval: ScheduleInterval) {
         config.interval = interval
-        updateNextRunDate()
+        updateNextRunDate(from: Date())
         if config.isEnabled {
             start()
         }
@@ -76,74 +82,22 @@ class SchedulerService: ObservableObject {
               Date() >= nextRun else { return }
 
         config.lastRunDate = Date()
-        updateNextRunDate()
+        updateNextRunDate(from: config.lastRunDate ?? Date())
+        start()
 
         Task {
             await onTrigger?()
         }
     }
 
-    private func updateNextRunDate() {
-        let base = config.lastRunDate ?? Date()
+    private func updateNextRunDate(from base: Date) {
         config.nextRunDate = base.addingTimeInterval(config.interval.seconds)
     }
 
     private func saveConfig() {
         if let data = try? JSONEncoder().encode(config) {
-            UserDefaults.standard.set(data, forKey: configKey)
+            defaults.set(data, forKey: configKey)
         }
     }
 
-    // MARK: - LaunchAgent Management
-
-    func installLaunchAgent() {
-        let plistName = "com.maclife.mclean.scheduler"
-        let plistPath = FileManager.default.homeDirectoryForCurrentUser
-            .appendingPathComponent("Library/LaunchAgents/\(plistName).plist")
-
-        guard let appPath = Bundle.main.executablePath else { return }
-
-        let intervalSeconds = Int(config.interval.seconds)
-        let plistContent = """
-        <?xml version="1.0" encoding="UTF-8"?>
-        <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-        <plist version="1.0">
-        <dict>
-            <key>Label</key>
-            <string>\(plistName)</string>
-            <key>ProgramArguments</key>
-            <array>
-                <string>\(appPath)</string>
-                <string>--scheduled-clean</string>
-            </array>
-            <key>StartInterval</key>
-            <integer>\(intervalSeconds)</integer>
-            <key>RunAtLoad</key>
-            <false/>
-        </dict>
-        </plist>
-        """
-
-        try? plistContent.write(to: plistPath, atomically: true, encoding: .utf8)
-
-        let task = Process()
-        task.executableURL = URL(fileURLWithPath: "/bin/launchctl")
-        task.arguments = ["load", plistPath.path]
-        try? task.run()
-        task.waitUntilExit()
-    }
-
-    func uninstallLaunchAgent() {
-        let plistName = "com.maclife.mclean.scheduler"
-        let plistPath = FileManager.default.homeDirectoryForCurrentUser
-            .appendingPathComponent("Library/LaunchAgents/\(plistName).plist")
-
-        let task = Process()
-        task.executableURL = URL(fileURLWithPath: "/bin/launchctl")
-        task.arguments = ["unload", plistPath.path]
-        try? task.run()
-        task.waitUntilExit()
-
-        try? FileManager.default.removeItem(at: plistPath)
-    }
 }

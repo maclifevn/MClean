@@ -18,6 +18,17 @@ jobs:
       - name: Generate Xcode project
         run: xcodegen generate
 
+      - name: Test
+        run: |
+          xcodebuild test -project MClean.xcodeproj \
+            -scheme MClean \
+            -configuration Debug \
+            -destination 'platform=macOS' \
+            -derivedDataPath build-ci-tests \
+            CODE_SIGN_IDENTITY="" \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGNING_ALLOWED=NO
+
       - name: Build (Universal Binary)
         run: |
           xcodebuild -project MClean.xcodeproj \

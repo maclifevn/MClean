@@ -11,6 +11,7 @@ struct WindowOpenerCapture: View {
         Color.clear
             .frame(width: 0, height: 0)
             .onAppear { WindowOpener.shared.open = { id in openWindow(id: id) } }
+            .background(MainWindowCapture())
     }
 }
 
@@ -19,6 +20,7 @@ struct WindowOpenerCapture: View {
 /// so the menu bar surface stays decoupled from the main window's `AppState`.
 struct MenuBarMonitorView: View {
     @ObservedObject private var monitor = SystemMonitor.shared
+    @State private var monitorOwner = UUID()
     let onSmartScan: () -> Void
     let onOpenApp: () -> Void
     let onOpenSettings: () -> Void
@@ -93,8 +95,8 @@ struct MenuBarMonitorView: View {
             .padding(.vertical, 11)
         }
         .frame(width: 304)
-        .onAppear { monitor.start(); monitor.startDetail() }
-        .onDisappear { monitor.stopDetail(); monitor.stop() }
+        .onAppear { monitor.start(owner: monitorOwner) }
+        .onDisappear { monitor.stop(owner: monitorOwner) }
     }
 
     private var header: some View {
@@ -164,6 +166,17 @@ private struct MeterRow: View {
                     .tint(tint)
                     .controlSize(.small)
             }
+        }
+    }
+}
+
+private struct MainWindowCapture: NSViewRepresentable {
+    func makeNSView(context: Context) -> NSView { CapturingView() }
+    func updateNSView(_ nsView: NSView, context: Context) {}
+    private final class CapturingView: NSView {
+        override func viewDidMoveToWindow() {
+            super.viewDidMoveToWindow()
+            if let window { WindowOpener.shared.mainWindow = window }
         }
     }
 }

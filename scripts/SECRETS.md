@@ -1,12 +1,13 @@
 # Release pipeline secrets
 
 `.github/workflows/release.yml` requires the following GitHub Actions secrets
-on `maclifevn/MClean`. All must be set before the next tag push or the
-notarize/staple steps will fail and ship a broken signature (the cause of #86).
+on `maclifevn/MClean`. Configure them before running the manual Release workflow.
+Missing signing/notarization/Sparkle credentials stop the workflow before publication.
 
-The pipeline uses an **App Store Connect API key** for notarization (modern,
-no rotation, scoped to one team) instead of the legacy
-`APPLE_ID + app-specific-password` flow.
+The CI pipeline uses an **Apple ID and app-specific password** for notarization,
+as selected during production preparation. It validates and stores them in the
+runner's temporary signing keychain for Team **CF5PGH3KGK**. Local releases can
+reuse an existing `notarytool` Keychain profile.
 
 ## Required secrets (6)
 
@@ -14,10 +15,20 @@ no rotation, scoped to one team) instead of the legacy
 |--------|--------|-------|
 | `BUILD_CERTIFICATE_BASE64` | Filtered Developer ID Application `.p12` (cert + matching private key only), base64 | `base64 -i cert.p12 \| pbcopy` |
 | `P12_PASSWORD` | Password set when exporting the `.p12` | Random — only you and CI need it |
-| `KEYCHAIN_PASSWORD` | Random string | Only used to lock the runner's temp keychain — never leaves CI |
-| `APP_STORE_CONNECT_KEY_ID` | The 10-char ID from the `.p8` filename (`AuthKey_XXXXXXXXXX.p8`) | e.g. `5G7R52L8RK` |
-| `APP_STORE_CONNECT_ISSUER_ID` | UUID from <https://appstoreconnect.apple.com/access/integrations/api> | e.g. `5de3898a-cd31-4061-850f-ae17b389e46a` |
-| `APP_STORE_CONNECT_PRIVATE_KEY` | Full contents of the `.p8` file (`-----BEGIN PRIVATE KEY-----` ... `-----END PRIVATE KEY-----`) | Paste raw, including the BEGIN/END lines |
+| `KEYCHAIN_PASSWORD` | Random string | Used to lock the runner's temporary signing keychain |
+| `NOTARIZATION_APPLE_ID` | Apple ID with access to the signing team's notarization service | Enter at the interactive Terminal prompt below |
+| `NOTARIZATION_APP_PASSWORD` | Apple app-specific password | Use an app-specific password, never the account's primary password |
+| `SPARKLE_PRIVATE_KEY` | Exported Ed25519 seed from Sparkle `generate_keys -x` | Keep the matching public key in `MClean/Info.plist`; never regenerate for each release |
+
+For the Sparkle key and signed appcast workflow, see [SPARKLE-UPDATES.md](../docs/SPARKLE-UPDATES.md). The key created for this integration uses the Keychain account `com.maclife.mclean`. Its public key is `uG9oyQv95UqnmgJdLQsaHjHwphJ65HvcbGbAhIluoy0=`. The private key stays outside the repository.
+
+Production preparation on **11 October 2026** configured all six required names
+on `maclifevn/MClean`, including both `NOTARIZATION_*` secrets after the owner
+ran the interactive setup. The workflow checks
+all required names before installing tools or building; it never prints values.
+Local **1.0.5 / build 6** has already been notarized with the existing profile
+`mdrivehealth`. See [PRODUCTION-RELEASE.md](../docs/PRODUCTION-RELEASE.md) for artifacts
+and CI verification status.
 
 ## Optional secret (1)
 
@@ -25,115 +36,129 @@ no rotation, scoped to one team) instead of the legacy
 |--------|--------|-------|
 | `HOMEBREW_TAP_TOKEN` | Fine-grained PAT with `Contents: read+write` on `maclifevn/homebrew-tap` | Without this the tap formula bump step is skipped (in-repo `homebrew/mclean.rb` still bumps via the default `GITHUB_TOKEN`) |
 
-## Extracting your Developer ID cert as a filtered `.p12`
+## Exporting the Developer ID identity
+
+In Keychain Access → My Certificates, select only **Developer ID Application**
+for Team **CF5PGH3KGK** (the team in `project.yml`), including its matching
+private key. Export that identity as `MClean-DeveloperID.p12` with a strong
+password. The pipeline rejects certificates from a different team so subsequent
+Developer ID releases keep a stable signing identity. The published 1.0.4 used
+Apple Development instead, so its existing Full Disk Access grant may need to
+be renewed when upgrading to the Developer ID release.
+
+Prepare a private directory outside the repository and keep the export password
+in `P12_PASSWORD.txt` there:
 
 ```bash
-mkdir -p ~/Desktop/MClean-secrets && cd ~/Desktop/MClean-secrets
-
-# 1. Export everything from login keychain
-P12_PWD=$(openssl rand -base64 24)
-echo "$P12_PWD" > P12_PASSWORD.txt
-security export -k login.keychain-db -t identities -f pkcs12 -P "$P12_PWD" -o all.p12
-
-# 2. Dump to PEM, isolate the Developer ID cert + matching private key
-openssl pkcs12 -in all.p12 -passin "pass:$P12_PWD" -nodes -out all.pem
-security find-certificate -c "Developer ID Application: Moamen Basel" -p login.keychain-db > devid.crt
-
-# 3. Use python to split private keys, then match by modulus
-python3 - <<'PY'
-import re
-content = open("all.pem").read()
-for i, k in enumerate(re.findall(r"-----BEGIN PRIVATE KEY-----.*?-----END PRIVATE KEY-----", content, re.DOTALL), 1):
-    open(f"key_{i}.pem", "w").write(k + "\n")
-PY
-
-CERT_MOD=$(openssl x509 -in devid.crt -modulus -noout | shasum -a 256 | awk '{print $1}')
-for k in key_*.pem; do
-  if [[ "$(openssl rsa -in "$k" -modulus -noout 2>/dev/null | shasum -a 256 | awk '{print $1}')" == "$CERT_MOD" ]]; then
-    cp "$k" devid.key && break
-  fi
-done
-
-# 4. Re-pack as a clean p12 with ONLY Developer ID + key
-openssl pkcs12 -export \
-  -in devid.crt -inkey devid.key \
-  -name "Developer ID Application: Moamen Basel (H3WXHVTP97)" \
-  -out MClean-DeveloperID.p12 \
-  -passout "pass:$P12_PWD" \
-  -macalg sha256 -keypbe AES-256-CBC -certpbe AES-256-CBC
-
-# 5. Base64 for the GH secret + scrub intermediates
-base64 -i MClean-DeveloperID.p12 -o MClean-DeveloperID.p12.b64
-rm -P all.p12 all.pem devid.key key_*.pem
+mkdir -p ~/Desktop/MClean-secrets
+chmod 700 ~/Desktop/MClean-secrets
+umask 077
+base64 -i ~/Desktop/MClean-secrets/MClean-DeveloperID.p12 \
+  -o ~/Desktop/MClean-secrets/MClean-DeveloperID.p12.b64
+openssl rand -base64 32 > ~/Desktop/MClean-secrets/KEYCHAIN_PASSWORD.txt
 ```
 
-## Storing the ASC API key locally for `notarytool`
+Exporting the entire login keychain is unnecessary. Back up the single identity
+in your secret manager; do not commit `.p12`, password files or Apple API keys.
 
-Already set up — confirmed via `xcrun notarytool history --keychain-profile AC_NOTARY`.
-For reference:
+## Local notarization profile
+
+`AC_NOTARY` was absent during the audit. The production preparation then found
+the working profile **`mdrivehealth`**, which accepted both the 1.0.5 app and DMG.
+No replacement credentials were created. Reuse it explicitly:
+
+```bash
+xcrun notarytool history --keychain-profile mdrivehealth
+scripts/release-local.sh 1.0.5 mdrivehealth
+# Or set MCLEAN_NOTARY_PROFILE=mdrivehealth for local runs.
+```
+
+On a new machine, create a profile interactively for the signing team:
 
 ```bash
 xcrun notarytool store-credentials AC_NOTARY \
-  --key ~/.appstoreconnect/private_keys/AuthKey_5G7R52L8RK.p8 \
-  --key-id 5G7R52L8RK \
-  --issuer 5de3898a-cd31-4061-850f-ae17b389e46a
+  --apple-id YOUR_DEVELOPER_APPLE_ID \
+  --team-id CF5PGH3KGK
+xcrun notarytool history --keychain-profile AC_NOTARY
 ```
 
-That keychain profile is consumed by `scripts/release-local.sh` for emergency
-hotfixes. The CI workflow uses raw secrets instead (no keychain dependency on
-the runner).
+The local script accepts a profile argument or `MCLEAN_NOTARY_PROFILE`, with
+`AC_NOTARY` as its fallback, and validates credentials before starting a build.
+CI runners cannot access a profile stored on this Mac. CI still needs the two
+notarization secrets. Replace the Apple ID placeholder with your account.
+Omitting `--password` lets Apple's tool ask for it securely in Terminal.
 
-## Setting them all via gh CLI
+## Interactive notarization setup
+
+Run this yourself in Terminal from the repository:
 
 ```bash
-# Fill in the 4 you control:
-P12_PWD=$(cat ~/Desktop/MClean-secrets/P12_PASSWORD.txt)
-KC_PWD=$(cat ~/Desktop/MClean-secrets/KEYCHAIN_PASSWORD.txt)
+python3 scripts/setup-notarization.py
+```
 
-gh secret set BUILD_CERTIFICATE_BASE64       --repo maclifevn/MClean < ~/Desktop/MClean-secrets/MClean-DeveloperID.p12.b64
-gh secret set P12_PASSWORD                   --repo maclifevn/MClean --body "$P12_PWD"
-gh secret set KEYCHAIN_PASSWORD              --repo maclifevn/MClean --body "$KC_PWD"
-gh secret set APP_STORE_CONNECT_KEY_ID       --repo maclifevn/MClean --body "5G7R52L8RK"
-gh secret set APP_STORE_CONNECT_ISSUER_ID    --repo maclifevn/MClean --body "5de3898a-cd31-4061-850f-ae17b389e46a"
-gh secret set APP_STORE_CONNECT_PRIVATE_KEY  --repo maclifevn/MClean < ~/.appstoreconnect/private_keys/AuthKey_5G7R52L8RK.p8
+The script prompts for your Apple ID and app-specific password with hidden
+password input. It checks notarization access for Team **CF5PGH3KGK** with Apple
+before changing any secrets, then sends both `NOTARIZATION_*` values to
+`maclifevn/MClean` through `gh secret set` stdin. It does not write a credentials
+file or put the entered password in shell history. It redacts credential values
+from command error messages. A failed Apple validation changes no secrets.
 
-# Optional:
-gh secret set HOMEBREW_TAP_TOKEN             --repo maclifevn/MClean --body "<your fine-grained PAT>"
+The Apple tool receives the password as a process argument during validation;
+the script does not print the command or enable shell tracing. Run it on your
+trusted Mac. The script does not publish a release or replace existing local
+notarization profiles. CI creates its own `MCLEAN_NOTARY` profile in a temporary
+keychain and deletes that keychain on completion.
 
-# Verify:
+If you need a new app-specific password, sign in yourself at
+[Apple Account](https://account.apple.com/) → Sign-In and Security →
+App-Specific Passwords. [Apple's instructions](https://support.apple.com/en-us/102654)
+describe creation and revocation; two-factor authentication is required.
+
+## Setting secrets via gh CLI
+
+```bash
+gh secret set BUILD_CERTIFICATE_BASE64 --repo maclifevn/MClean < ~/Desktop/MClean-secrets/MClean-DeveloperID.p12.b64
+gh secret set P12_PASSWORD --repo maclifevn/MClean < ~/Desktop/MClean-secrets/P12_PASSWORD.txt
+gh secret set KEYCHAIN_PASSWORD --repo maclifevn/MClean < ~/Desktop/MClean-secrets/KEYCHAIN_PASSWORD.txt
+# Configure NOTARIZATION_APPLE_ID and NOTARIZATION_APP_PASSWORD interactively:
+python3 scripts/setup-notarization.py
+gh secret set SPARKLE_PRIVATE_KEY --repo maclifevn/MClean \
+  < /Users/maclife/.codex/backups/MClean-sparkle-20261011-103249/sparkle-private-key.txt
+
+# Optional: gh prompts for the token without displaying it.
+gh secret set HOMEBREW_TAP_TOKEN --repo maclifevn/MClean
 gh secret list --repo maclifevn/MClean
 ```
 
-After upload:
-
-```bash
-rm -P ~/Desktop/MClean-secrets/MClean-DeveloperID.p12* \
-      ~/Desktop/MClean-secrets/P12_PASSWORD.txt \
-      ~/Desktop/MClean-secrets/KEYCHAIN_PASSWORD.txt
-```
+Before overwriting a secret, check `gh secret list` and keep its matching key and
+password together in your secret manager. The production preparation already
+configured four names; the commands for those names are examples for a new setup.
 
 ## Triggering a release
 
 Dry run first (build + sign + notarize, no upload, no homebrew bump):
 
 ```bash
-gh workflow run release.yml --repo maclifevn/MClean -f version=2.2.0 -f dry_run=true
+gh workflow run release.yml --repo maclifevn/MClean -f version=1.0.5 -f dry_run=true
 gh run watch --repo maclifevn/MClean
 ```
 
 Real release (after dry run is green):
 
 ```bash
-git tag v2.2.0
-git push origin v2.2.0
+gh workflow run release.yml --repo maclifevn/MClean -f version=1.0.5 -f dry_run=false
 ```
+
+Publication requires `main`; preparation branches can run with `dry_run=true`.
+Merge reviewed source first so the release and Homebrew bump use the intended revision.
 
 ## What ships
 
 | Artifact | Purpose |
 |----------|---------|
 | `MClean-X.Y.Z.dmg` | Direct download link in release notes (signed + notarized + stapled) |
-| `MClean-X.Y.Z.zip` | Source for the homebrew cask (notarized + stapled `.app` inside) |
+| `MClean-X.Y.Z.zip` | Homebrew and Sparkle archive (notarized + stapled `.app` inside, Ed25519 signature in appcast) |
+| `appcast.xml` | Signed Sparkle feed; published at the stable `appcast` release after the versioned assets |
 
 Both checksums land in `build/CHECKSUMS.md` and the GH release body.
 

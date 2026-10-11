@@ -19,18 +19,27 @@ final class SpaceLensNode: Identifiable, @unchecked Sendable {
     /// permissions); its size is whatever was reachable, possibly zero.
     var isAccessDenied: Bool = false
     private(set) var size: Int64
-    /// Sorted descending by size. Contains directories and files at or above
-    /// the engine's minNodeSize; smaller files are folded into `prunedSize`.
+    /// All directories are navigable; small files fold into `prunedSize`
+    /// until the user requests a detailed scan of this folder.
     private(set) var children: [SpaceLensNode]
     /// Files too small to earn their own node; their bytes are already
     /// included in `size`.
-    let prunedCount: Int
-    let prunedSize: Int64
+    private(set) var prunedCount: Int
+    private(set) var prunedSize: Int64
+    private(set) var ownSize: Int64
+    private(set) var fileCount: Int
+    /// Includes this directory (and directories inside packages).
+    private(set) var directoryCount: Int
+    private(set) var inaccessibleCount: Int
+    private(set) var skippedCount: Int
+    var isPartial: Bool { inaccessibleCount > 0 || skippedCount > 0 }
     private(set) weak var parent: SpaceLensNode?
 
     init(url: URL, name: String? = nil, isDirectory: Bool, isPackage: Bool = false,
          size: Int64 = 0, children: [SpaceLensNode] = [],
-         prunedCount: Int = 0, prunedSize: Int64 = 0) {
+         prunedCount: Int = 0, prunedSize: Int64 = 0,
+         ownSize: Int64 = 0, fileCount: Int = 0, directoryCount: Int = 0,
+         inaccessibleCount: Int = 0, skippedCount: Int = 0) {
         self.url = url
         self.name = name ?? url.lastPathComponent
         self.isDirectory = isDirectory
@@ -39,6 +48,11 @@ final class SpaceLensNode: Identifiable, @unchecked Sendable {
         self.children = children
         self.prunedCount = prunedCount
         self.prunedSize = prunedSize
+        self.ownSize = ownSize
+        self.fileCount = fileCount
+        self.directoryCount = directoryCount
+        self.inaccessibleCount = inaccessibleCount
+        self.skippedCount = skippedCount
         for child in children { child.parent = self }
     }
 
@@ -71,7 +85,13 @@ final class SpaceLensNode: Identifiable, @unchecked Sendable {
         var cursor: SpaceLensNode? = self
         while let current = cursor {
             current.size -= node.size
+            current.fileCount -= node.fileCount
+            current.directoryCount -= node.directoryCount
+            current.inaccessibleCount -= node.inaccessibleCount
+            current.skippedCount -= node.skippedCount
             cursor = current.parent
         }
+        node.parent = nil
     }
+
 }

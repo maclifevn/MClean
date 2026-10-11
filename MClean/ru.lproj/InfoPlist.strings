@@ -1,0 +1,8 @@
+/* macOS permission prompts */
+"NSAppleEventsUsageDescription" = "MClean использует Apple Events для взаимодействия с Finder при показе файлов.";
+"NSDesktopFolderUsageDescription" = "MClean требуется доступ к папке «Рабочий стол», чтобы находить мусорные и остаточные файлы.";
+"NSDocumentsFolderUsageDescription" = "MClean требуется доступ к папке «Документы», чтобы находить мусорные и остаточные файлы.";
+"NSDownloadsFolderUsageDescription" = "MClean требуется доступ к папке «Загрузки», чтобы находить мусорные и остаточные файлы.";
+"NSRemovableVolumesUsageDescription" = "MClean требуется доступ к съёмным томам для поиска мусорных файлов.";
+"NSSystemAdministrationUsageDescription" = "MClean требуются права администратора, чтобы полностью очищать кэши и удалять приложения.";
+"NSHumanReadableCopyright" = "© 2026. Лицензия MIT.";

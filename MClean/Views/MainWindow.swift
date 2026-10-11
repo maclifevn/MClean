@@ -147,6 +147,14 @@ struct MainWindow: View {
                 } header: { sectionLabel("Applications") }
 
                 Section {
+                    navRow(section: .duplicates, label: "Duplicate Finder", icon: "doc.on.doc.fill", tint: Tint.purple, badge: nil)
+                    navRow(section: .similarPhotos, label: "Similar Photos", icon: "photo.on.rectangle.angled", tint: Tint.pink, badge: nil)
+                    navRow(section: .protection, label: "Protection", icon: "shield.lefthalf.filled", tint: Tint.green, badge: nil)
+                    navRow(section: .performance, label: "Performance", icon: "gauge.with.dots.needle.67percent", tint: Tint.orange, badge: nil)
+                    navRow(section: .appUpdates, label: "App Updates", icon: "arrow.triangle.2.circlepath", tint: Tint.blue, badge: nil)
+                } header: { sectionLabel("Tools") }
+
+                Section {
                     ForEach(CleaningCategory.scannable) { category in
                         navRow(section: .cleaning(category),
                                label: LocalizedStringKey(category.rawValue),
@@ -287,6 +295,11 @@ struct MainWindow: View {
             OrphanListView()
         case .spaceLens:
             SpaceLensView()
+        case .duplicates: DuplicateFinderView()
+        case .similarPhotos: SimilarPhotosView()
+        case .protection: ProtectionView()
+        case .performance: PerformanceView()
+        case .appUpdates: AppUpdatesView()
         case .cleaning(let category):
             if category == .smartScan {
                 DashboardView()

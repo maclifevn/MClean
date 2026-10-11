@@ -7,6 +7,7 @@ import SwiftUI
 struct DashboardView: View {
     @EnvironmentObject var appState: AppState
     @State private var showConfirmation = false
+    @State private var pendingItemIDs = Set<UUID>()
     @State private var fireCleanConfetti = false
     @State private var lastCleanedScanState: Bool = false
     @State private var hoveredSegment: String?
@@ -16,6 +17,7 @@ struct DashboardView: View {
     @State private var burstOrigin: UnitPoint = UnitPoint(x: 0.25, y: 0.28)
     @State private var dashboardSize: CGSize = .zero
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @AppStorage("settings.general.confirmBeforeDelete") private var confirmBeforeDelete = true
 
     private let dashboardSpace = "dashboard"
 
@@ -87,7 +89,7 @@ struct DashboardView: View {
             }
 
             // Celebratory burst when a clean cycle finishes with something
-            // freed. Origin tracks the SuccessMedal's real frame (see
+            // processed. Origin tracks the SuccessMedal's real frame (see
             // burstOrigin) so it explodes from the celebration on any window
             // size / layout direction.
             // allowsHitTesting=false keeps Done clickable through particles.
@@ -103,14 +105,14 @@ struct DashboardView: View {
         )
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .onChange(of: appState.scanState) { newState in
-            // Fire only on the rising edge of .cleaned with freed > 0 so
+            // Fire only on the rising edge of .cleaned with processed bytes > 0 so
             // the burst doesn't replay when the user navigates back to the
             // dashboard while .cleaned is still on screen.
             let isCleaned: Bool = {
                 if case .cleaned = newState { return true }
                 return false
             }()
-            if isCleaned && !lastCleanedScanState && appState.totalFreedSpace > 0 {
+            if isCleaned && !lastCleanedScanState && appState.totalProcessedSpace > 0 {
                 if reduceMotion {
                     // Confetti renders nothing under Reduce Motion; no need
                     // to wait for an entrance spring that isn't playing.
@@ -125,15 +127,17 @@ struct DashboardView: View {
             }
             lastCleanedScanState = isCleaned
         }
+        .onChange(of: showConfirmation) { appState.showCleanConfirmation = $0 }
+        .onDisappear { appState.showCleanConfirmation = false }
         .confirmationDialog(
             cleanConfirmationTitle,
             isPresented: $showConfirmation,
             titleVisibility: .visible
         ) {
-            Button("Clean", role: .destructive) { appState.cleanAll() }
+            Button("Clean", role: .destructive) { appState.cleanAll(itemIDs: pendingItemIDs) }
             Button("Cancel", role: .cancel) {}
         } message: {
-            Text("This will permanently delete the selected files. This cannot be undone.")
+            Text("Files will be moved to the Trash. Items already in the Trash, simulator runtimes and Docker prune are permanently removed.")
         }
     }
 
@@ -496,7 +500,13 @@ struct DashboardView: View {
                     HStack {
                         if appState.totalSelectedSize > 0 {
                             Button {
-                                showConfirmation = true
+                                let selected = appState.allResults.flatMap(\.items).filter(appState.isItemSelected)
+                                pendingItemIDs = Set(selected.map(\.id))
+                                if confirmBeforeDelete || selected.contains(where: { $0.isActionItem }) {
+                                    showConfirmation = true
+                                } else {
+                                    appState.cleanAll()
+                                }
                             } label: {
                                 Label {
                                     Text(cleanSelectedLabel)
@@ -589,10 +599,10 @@ struct DashboardView: View {
                     )
 
                 VStack(alignment: .leading, spacing: 6) {
-                    CountUpBytes(bytes: appState.totalFreedSpace)
+                    CountUpBytes(bytes: appState.totalProcessedSpace)
                         .font(.system(size: 40, weight: .semibold))
                         .foregroundStyle(Tint.green)
-                    Text("freed")
+                    Text("cleaned")
                         .font(.system(size: 14))
                         .foregroundStyle(.secondary)
                     Button("Done") { appState.scanState = .idle }
@@ -779,6 +789,7 @@ private struct HeroDrift: View {
             center: .center, startRadius: 10, endRadius: 130
         )
         .blur(radius: 24)
+        .drawingGroup()
         .scaleEffect(drift ? 1.12 : 0.96)
         .offset(x: drift ? 8 : -8)
         .onAppear {
