@@ -1,8 +1,8 @@
 # Chuẩn bị MClean 1.0.5 — 11/10/2026
 
-**Version 1.0.5 / build 6** đã archive/export Universal, ký Developer ID và được Apple chấp nhận notarization cho cả app và DMG. App/DMG đã staple và Gatekeeper chấp nhận trên host lẫn máy ảo macOS 15.7.7. Đã tạo ZIP và signed Sparkle appcast. GitHub đã có **6/6 secrets bắt buộc** sau khi chủ tài khoản nhập credentials trong Terminal. Bộ cài được giữ local, chưa tạo GitHub release hoặc xuất bản feed.
+**Version 1.0.5 / build 6** đã archive/export Universal, ký Developer ID và được Apple chấp nhận notarization cho cả app và DMG. App/DMG đã staple và Gatekeeper chấp nhận trên host lẫn máy ảo macOS 15.7.7. **GitHub Build và Release dry run đều đạt**, mỗi workflow chạy **198 test / 0 lỗi**. Đủ **6/6 secrets**, ZIP và signed Sparkle appcast đã tạo. [PR nháp #7](https://github.com/maclifevn/MClean/pull/7) giữ source để review; chưa tạo release phiên bản hoặc xuất bản feed production.
 
-Giao diện MClean hiện có được giữ. Lượt này tăng version/build trong `project.yml`, project Xcode và fallback CLI; sửa preflight credentials và thứ tự đóng gói trong pipeline. Các bản sửa chức năng và **198 test / 0 lỗi** thuộc lượt audit ngay trước đó, được ghi tại [PRODUCTION-AUDIT.md](PRODUCTION-AUDIT.md). Lượt chuẩn bị không chạy lại toàn bộ XCTest; đã build/archive lại đúng version production và kiểm tra artifact thực tế.
+Giao diện MClean hiện có được giữ. Lượt này tăng version/build trong `project.yml`, project Xcode và fallback CLI; sửa preflight credentials và thứ tự đóng gói trong pipeline. Các bản sửa chức năng thuộc lượt audit ngay trước đó, được ghi tại [PRODUCTION-AUDIT.md](PRODUCTION-AUDIT.md). Host đã build/archive lại version production; CI chạy lại đầy đủ XCTest trên macOS 15 arm64.
 
 ## Chữ ký và notarization
 
@@ -28,7 +28,7 @@ ZIP cuối cùng được tạo **sau khi staple app**. DMG cũng chứa bản a
 scripts/release-local.sh 1.0.5 mdrivehealth
 ```
 
-## Artifact đã chuẩn bị
+## Artifact local ban đầu
 
 Thư mục riêng ngoài Git:
 
@@ -72,7 +72,36 @@ Script ẩn password, kiểm tra quyền notarization Team **CF5PGH3KGK** với 
 
 YAML, **24 Bash blocks**, shell/Python syntax, ca đủ credentials và sáu ca thiếu từng secret đều đạt. Mock kiểm tra profile notarization dùng keychain tạm, đúng signing team và dừng khi Apple từ chối; hai bước submit dùng cùng profile. Publication chỉ được chạy từ `main`; nhánh chuẩn bị dùng `dry_run=true`.
 
-`HOMEBREW_TAP_TOKEN` là tùy chọn nếu muốn tự cập nhật repo tap riêng. Chi tiết thiết lập tại [scripts/SECRETS.md](../scripts/SECRETS.md). Cần kết quả Release dry run trên runner GitHub thật trước xuất bản.
+`HOMEBREW_TAP_TOKEN` là tùy chọn nếu muốn tự cập nhật repo tap riêng. Chi tiết thiết lập tại [scripts/SECRETS.md](../scripts/SECRETS.md). Credentials và pipeline đã được xác nhận bằng runner GitHub thật.
+
+## GitHub CI đã đạt
+
+Revision được kiểm tra: **`a825fcc875ff40cd7b9e8ee9b358d61ff3fc12c9`** trên nhánh `codex/sync-puremac-keep-interface`.
+
+| Workflow / bước | Kết quả |
+|---|---|
+| [Build](https://github.com/maclifevn/MClean/actions/runs/38114818221) | **Success**, 198 test / 0 lỗi và build Universal |
+| [Release dry run](https://github.com/maclifevn/MClean/actions/runs/38114820763) | **Success**, 198 test / 0 lỗi; import certificate, xác thực Apple ID, archive/export, notarize/staple và upload artifact đạt |
+| App notarization CI | **Accepted**, ID `e69d2c61-8275-467a-8d13-3f83ebf6898a` |
+| DMG notarization CI | **Accepted**, ID `4a5428e6-6f0d-4445-b785-fd61ed363db2` |
+| Sparkle / Gatekeeper | Feed/ZIP được SDK xác minh; app/DMG staple và Gatekeeper đạt |
+| Xuất bản | Bốn bước tạo release, publish feed và bump Homebrew đều **skipped** vì dry run |
+| Cleanup | Keychain chứa signing/notarization và các file secret tạm được xóa |
+
+Lượt CI đầu cũng đạt tại [Build 38114314449](https://github.com/maclifevn/MClean/actions/runs/38114314449) và [Release 38114377280](https://github.com/maclifevn/MClean/actions/runs/38114377280), revision `b36a370`. Runner báo Node 20 deprecation ở hai Actions cũ, nên đã đổi sang SHA cố định của [checkout 7.0.1](https://github.com/actions/checkout/blob/v7.0.1/action.yml) và [upload-artifact 7.0.2](https://github.com/actions/upload-artifact/blob/v7.0.2/action.yml), đều dùng Node 24, rồi chạy lại hai workflow nêu trên thành công. Cảnh báo Node 20 đã hết. Các cảnh báo deployment của thư viện XCTest chỉ thuộc test bundle; app vẫn hỗ trợ macOS 13.0.
+
+Artifact từ lượt CI cuối được lưu tại:
+
+`/Users/maclife/.codex/backups/MClean-production-prep-20261011-114702/CI-38114820763/`
+
+```text
+195e2492e62b7e6329cb0ecba2b75a07adda22aadeb5bb7480235542580cdcdd  MClean-1.0.5.dmg
+00bccb708847d1200cbaa92c6d794e7bff0ecd47e6a29125465661e080fc28f4  MClean-1.0.5.zip
+```
+
+Sau tải về đã kiểm tra lại checksum, version/build, bundle ID, public key Sparkle, hai kiến trúc, hardened runtime, strict codesign, staple và Gatekeeper của app/DMG. CLI chạy đúng 1.0.5; SDK Sparkle xác minh chữ ký feed và ZIP. Bằng chứng: `ci-artifact-verification-38114820763.log`; logs workflow: `ci-build-38114818221.log`, `ci-release-38114820763.log`, `ci-final-run.json`. VM đã dừng sau kiểm tra mở app, các artifact và snapshot được giữ.
+
+Dùng ZIP, DMG và `appcast/appcast.xml` **cùng một lượt build** khi xuất bản để chữ ký và checksum khớp nhau. Artifact GitHub lưu 14 ngày; bản sao local được giữ. Log CI đầy đủ, JSON kết quả và bằng chứng xác minh sau tải nằm trong thư mục backup. Lượt local và CI tạo các checksum khác nhau vì là các build riêng.
 
 ## Nâng cấp từ 1.0.4 và kiểm tra trước xuất bản
 
@@ -82,7 +111,7 @@ Người dùng bản chưa tích hợp Sparkle cần tải/cài bản 1.0.5 mộ
 
 Trước khi xuất bản:
 
-1. Lưu source đã kiểm tra lên repo và chạy Release với `dry_run=true` trên đúng revision; kiểm tra ký/notarization bằng runner thật.
+1. Review/merge PR nháp #7 vào `main` sau khi hoàn tất QA. Nếu source thay đổi so với revision đã kiểm tra, chạy lại dry run cho thay đổi đó. Publication chỉ chạy từ `main`.
 2. Kiểm tra tải bộ cài qua trình duyệt, cài mới và nâng cấp từ 1.0.4; xác minh Full Disk Access sau relaunch. VM hiện kiểm tra ticket/Gatekeeper bằng bản app có quarantine để mô phỏng file tải về, không thay thế phép thử tải thật qua trình duyệt.
 3. Kiểm tra thủ công Settings relaunch trên macOS 15 và chạy smoke test Intel/macOS thấp nhất còn hỗ trợ. Audit đã thử breadcrumb và Sparkle install/relaunch trong VM; chưa thử runtime trên Intel/macOS 13/14 hoặc quét/dọn toàn ổ dữ liệu cá nhân với Full Disk Access.
 4. Chỉ tạo release phiên bản mới khi các kiểm tra đạt; upload ZIP/DMG trước, feed đã ký sau. Không ghi đè asset của version đã phát hành. Lấy lại feed hiện hành và xác minh lịch sử trước khi xuất bản nếu repo đã có thêm update.
