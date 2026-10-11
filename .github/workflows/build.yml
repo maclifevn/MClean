@@ -43,6 +43,20 @@ jobs:
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGNING_ALLOWED=NO
 
+      - name: Test x86_64 on macOS 14 (Rosetta)
+        if: matrix.runner == 'macos-14'
+        run: |
+          xcodebuild test -project MClean.xcodeproj \
+            -scheme MClean \
+            -configuration Debug \
+            -destination 'platform=macOS,arch=x86_64' \
+            -derivedDataPath build-ci-rosetta-tests \
+            ARCHS=x86_64 \
+            ONLY_ACTIVE_ARCH=YES \
+            CODE_SIGN_IDENTITY="" \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGNING_ALLOWED=NO
+
       - name: Build (Universal Binary)
         run: |
           xcodebuild -project MClean.xcodeproj \
@@ -66,3 +80,10 @@ jobs:
           status=$?
           set -e
           test "$status" -eq 2
+
+      - name: Smoke test x86_64 on macOS 14 (Rosetta)
+        if: matrix.runner == 'macos-14'
+        run: |
+          app="build/Build/Products/Release/MClean.app"
+          arch -x86_64 "$app/Contents/MacOS/MClean" --version
+          arch -x86_64 "$app/Contents/MacOS/MClean" disk-info
