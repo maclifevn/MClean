@@ -17,6 +17,8 @@ import Foundation
 final class PermissionCoordinator: ObservableObject {
     static let shared = PermissionCoordinator()
 
+    enum Presentation { case mainWindow, settingsWindow }
+    @Published private(set) var presentation: Presentation = .mainWindow
     @Published private(set) var isRequesting: Bool = false
     @Published private(set) var hasFullDiskAccess: Bool = false
     /// True when the FDA toggle is on in System Settings but this process
@@ -57,6 +59,7 @@ final class PermissionCoordinator: ObservableObject {
     /// Serializes the fresh-process probe so poll ticks never stack child
     /// processes if one probe runs long.
     private var freshProbeInFlight = false
+    private var lastFreshProbeAt = Date.distantPast
 
     private init() {
         hasFullDiskAccess = FullDiskAccessManager.shared.hasFullDiskAccess
@@ -71,6 +74,7 @@ final class PermissionCoordinator: ObservableObject {
     /// two Timers or leaking the first callback's captured state.
     func requestAccess(
         context: PromptContext = .general,
+        presentation: Presentation = .mainWindow,
         failedPaths: [String] = [],
         onGranted: @escaping () -> Void
     ) {
@@ -83,7 +87,9 @@ final class PermissionCoordinator: ObservableObject {
         pendingGrantWork?.cancel()
         pendingGrantWork = nil
 
+        self.presentation = presentation
         self.context = context
+        self.needsRelaunch = false
         self.failedItemPaths = failedPaths
         self.onGrantCallback = onGranted
         self.hasFullDiskAccess = FullDiskAccessManager.shared.hasFullDiskAccess
@@ -134,6 +140,7 @@ final class PermissionCoordinator: ObservableObject {
         let callback = onGrantCallback
         onGrantCallback = nil
         isRequesting = false
+        needsRelaunch = false
         failedItemPaths = []
         context = .general
         if callRetry { callback?() }
@@ -201,7 +208,11 @@ final class PermissionCoordinator: ObservableObject {
     /// "watching…" state for a Relaunch button. Without this the sheet polls
     /// forever: macOS never applies an FDA grant to an already-running process.
     private func checkForPendingRelaunch() {
-        guard !needsRelaunch, !freshProbeInFlight else { return }
+        let now = Date()
+        guard !needsRelaunch,
+              !freshProbeInFlight,
+              now.timeIntervalSince(lastFreshProbeAt) >= 3 else { return }
+        lastFreshProbeAt = now
         freshProbeInFlight = true
         Task.detached(priority: .userInitiated) {
             let grantedInFreshProcess =
@@ -209,7 +220,7 @@ final class PermissionCoordinator: ObservableObject {
             await MainActor.run { [weak self] in
                 guard let self else { return }
                 self.freshProbeInFlight = false
-                if grantedInFreshProcess, !self.hasFullDiskAccess {
+                if grantedInFreshProcess, self.isRequesting, !self.hasFullDiskAccess {
                     self.needsRelaunch = true
                     Haptics.success()
                 }

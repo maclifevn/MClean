@@ -1,270 +1,254 @@
+import Darwin
 import Foundation
 
-/// Builds the Space Lens size tree: one full recursive pass over a chosen
-/// folder, sizing every file and keeping nodes only for directories and
-/// files at or above `minNodeSize` (smaller files fold into their parent's
-/// pruned tally). Full scan over lazy expansion because top-level folder
-/// sizes require walking everything underneath anyway; pruning is what
-/// bounds memory, not laziness.
+enum SpaceLensScanError: LocalizedError, Equatable {
+    case notDirectory(String)
+    case symbolicLink(String)
+    case package(String)
+    case cloudOnly(String)
+    case unavailable(String)
+
+    var errorDescription: String? {
+        switch self {
+        case .notDirectory(let path):
+            return String(localized: "The selected item is not a folder: \(path)")
+        case .symbolicLink(let path):
+            return String(localized: "Symbolic links cannot be scanned: \(path)")
+        case .package(let path):
+            return String(localized: "App and document packages are excluded: \(path)")
+        case .cloudOnly(let path):
+            return String(localized: "The selected folder is stored in the cloud and has not been downloaded: \(path)")
+        case .unavailable(let path):
+            return String(localized: "The selected folder could not be read: \(path)")
+        }
+    }
+}
+
+/// One allocated-size tree powers the map, list and combined view. Directory
+/// nodes remain navigable at every size; small files are grouped by default.
+/// A full-detail scan can retain them when explicitly requested by the user.
 actor SpaceLensEngine {
     struct Progress: Sendable {
         let scannedBytes: Int64
         let itemCount: Int
         let currentPath: String
+        let inaccessibleCount: Int
+        let skippedCount: Int
     }
 
-    /// Byte and item counters shared across the per-directory scan tasks,
-    /// plus the ~10 Hz throttle gate for progress callbacks (same cadence as
-    /// ScanEngine's path reporter).
+    private struct FileIdentity: Hashable {
+        let device: dev_t
+        let inode: ino_t
+    }
+
     private final class ProgressBox: @unchecked Sendable {
         private let lock = NSLock()
-        private var scannedBytes: Int64 = 0
-        private var itemCount = 0
+        private var bytes: Int64 = 0
+        private var items = 0
+        private var inaccessible = 0
+        private var skipped = 0
         private var lastReport = Date.distantPast
+        private var seenHardLinks: Set<FileIdentity> = []
         private let onProgress: @Sendable (Progress) -> Void
-        /// Inodes of multi-link files already counted, so hard links don't
-        /// inflate totals. Only files with linkCount > 1 are tracked — the
-        /// set stays tiny.
-        private var seenHardLinks = Set<NSObject>()
 
         init(onProgress: @escaping @Sendable (Progress) -> Void) {
             self.onProgress = onProgress
         }
 
-        func add(bytes: Int64, path: @autoclosure () -> String) {
+        func record(bytes: Int64 = 0, items: Int = 0, inaccessible: Int = 0,
+                    skipped: Int = 0, path: String, force: Bool = false) {
             lock.lock()
-            scannedBytes += bytes
-            itemCount += 1
+            self.bytes += bytes
+            self.items += items
+            self.inaccessible += inaccessible
+            self.skipped += skipped
             let now = Date()
-            let shouldReport = now.timeIntervalSince(lastReport) > 0.1
-            if shouldReport { lastReport = now }
-            let snapshot = Progress(scannedBytes: scannedBytes, itemCount: itemCount,
-                                    currentPath: shouldReport ? path() : "")
+            let report = force || now.timeIntervalSince(lastReport) > 0.1
+            if report { lastReport = now }
+            let snapshot = Progress(scannedBytes: self.bytes, itemCount: self.items,
+                                    currentPath: path, inaccessibleCount: self.inaccessible,
+                                    skippedCount: self.skipped)
             lock.unlock()
-            if shouldReport { onProgress(snapshot) }
+            if report { onProgress(snapshot) }
         }
 
-        /// Returns false when this multi-link inode was already counted.
-        func claimHardLink(_ identifier: NSObject) -> Bool {
+        func claim(_ metadata: stat) -> Bool {
+            guard metadata.st_nlink > 1 else { return true }
             lock.lock()
             defer { lock.unlock() }
-            return seenHardLinks.insert(identifier).inserted
+            return seenHardLinks.insert(FileIdentity(device: metadata.st_dev, inode: metadata.st_ino)).inserted
         }
     }
 
-    private static let resourceKeys: [URLResourceKey] = [
-        .isDirectoryKey, .isSymbolicLinkKey, .isPackageKey,
-        .totalFileAllocatedSizeKey, .fileAllocatedSizeKey,
-        .linkCountKey, .fileResourceIdentifierKey,
+    private struct Measurement {
+        var node: SpaceLensNode?
+        var skipped = 0
+        var inaccessible = 0
+    }
+
+    private static let resourceKeys: Set<URLResourceKey> = [
+        .isPackageKey, .totalFileAllocatedSizeKey, .fileAllocatedSizeKey,
+        .isUbiquitousItemKey, .ubiquitousItemDownloadingStatusKey
     ]
-    /// Prebuilt Set of the same keys. `resourceValues(forKeys:)` takes a Set,
-    /// so caching it avoids allocating a fresh Set per entry across a
-    /// hundreds-of-thousands-of-inodes tree walk.
-    private static let resourceKeySet = Set(resourceKeys)
 
-    /// Scan `root` and return its tree. Hidden files are included — finding
-    /// space is the point. Symlinks are counted as the link itself, never
-    /// followed. Throws CancellationError when the surrounding task is
-    /// cancelled.
-    func scan(root: URL,
-              minNodeSize: Int64 = 1_048_576,
+    func scan(root selectedURL: URL, minNodeSize: Int64 = 1_048_576,
               onProgress: @escaping @Sendable (Progress) -> Void) async throws -> SpaceLensNode {
-        let progress = ProgressBox(onProgress: onProgress)
-        let fileManager = FileManager.default
-
-        // Fan out across the root's immediate subdirectories, capped at the
-        // core count in flight; loose files at the root are handled inline.
-        var subdirectories: [URL] = []
-        var looseEntries: [URL] = []
-        var rootDenied = false
-        do {
-            for entry in try fileManager.contentsOfDirectory(
-                at: root, includingPropertiesForKeys: Self.resourceKeys, options: []
-            ) {
-                // Read the SAME key set that was prefetched above, so this
-                // resolves from the URL's resource cache instead of forcing a
-                // second getattrlist syscall per entry.
-                let values = try? entry.resourceValues(forKeys: Self.resourceKeySet)
-                let isRealDirectory = (values?.isDirectory ?? false)
-                    && !(values?.isSymbolicLink ?? false)
-                    && !(values?.isPackage ?? false)
-                    && entry.pathExtension != "app"
-                if isRealDirectory {
-                    subdirectories.append(entry)
-                } else {
-                    looseEntries.append(entry)
-                }
-            }
-        } catch {
-            rootDenied = true
-        }
-
-        var childNodes: [SpaceLensNode] = []
-        var pruned = (count: 0, size: Int64(0))
-
-        try await withThrowingTaskGroup(of: SpaceLensNode.self) { group in
-            var pending = subdirectories.makeIterator()
-            var inFlight = 0
-            let cap = max(2, ProcessInfo.processInfo.activeProcessorCount)
-
-            func submitNext() {
-                guard let dir = pending.next() else { return }
-                inFlight += 1
-                group.addTask {
-                    try Self.buildTree(at: dir, minNodeSize: minNodeSize,
-                                       progress: progress)
-                }
-            }
-            for _ in 0..<cap { submitNext() }
-            while inFlight > 0 {
-                guard let node = try await group.next() else { break }
-                inFlight -= 1
-                childNodes.append(node)
-                submitNext()
-            }
-        }
-
-        for entry in looseEntries {
-            try Task.checkCancellation()
-            let (bytes, node) = Self.sizeLeaf(at: entry, minNodeSize: minNodeSize,
-                                              progress: progress)
-            if let node {
-                childNodes.append(node)
-            } else {
-                pruned.count += 1
-                pruned.size += bytes
-            }
-        }
-
-        childNodes.sort { $0.size > $1.size }
-        let totalSize = childNodes.reduce(pruned.size) { $0 + $1.size }
-        let rootNode = SpaceLensNode(
-            url: root, isDirectory: true,
-            size: totalSize, children: childNodes,
-            prunedCount: pruned.count, prunedSize: pruned.size
-        )
-        rootNode.isAccessDenied = rootDenied
-        return rootNode
-    }
-
-    // MARK: - Traversal (runs on task-group threads, no actor hops)
-
-    /// Synchronous depth-first build of one directory subtree.
-    private static func buildTree(at url: URL, minNodeSize: Int64,
-                                  progress: ProgressBox) throws -> SpaceLensNode {
         try Task.checkCancellation()
+        let root = selectedURL.standardizedFileURL
+        guard let metadata = Self.metadata(at: root) else { throw SpaceLensScanError.unavailable(root.path) }
+        guard metadata.st_mode & S_IFMT != S_IFLNK else { throw SpaceLensScanError.symbolicLink(root.path) }
+        guard metadata.st_mode & S_IFMT == S_IFDIR else { throw SpaceLensScanError.notDirectory(root.path) }
+        guard !Self.isDataless(metadata) else { throw SpaceLensScanError.cloudOnly(root.path) }
+        guard let values = try? root.resourceValues(forKeys: Self.resourceKeys) else {
+            throw SpaceLensScanError.unavailable(root.path)
+        }
+        guard !Self.isCloudOnly(values) else { throw SpaceLensScanError.cloudOnly(root.path) }
+        guard values.isPackage != true, root.pathExtension != "app" else { throw SpaceLensScanError.package(root.path) }
 
-        let fileManager = FileManager.default
-        var children: [SpaceLensNode] = []
-        var prunedCount = 0
-        var prunedSize: Int64 = 0
-        var denied = false
-
+        let progress = ProgressBox(onProgress: onProgress)
+        let ownSize = Self.allocatedBytes(metadata: metadata, values: values)
+        progress.record(bytes: ownSize, items: 1, path: root.path)
         let entries: [URL]
         do {
-            entries = try fileManager.contentsOfDirectory(
-                at: url, includingPropertiesForKeys: resourceKeys, options: []
+            entries = try FileManager.default.contentsOfDirectory(
+                at: root, includingPropertiesForKeys: Array(Self.resourceKeys), options: []
             )
         } catch {
-            entries = []
-            denied = true
+            progress.record(inaccessible: 1, path: root.path, force: true)
+            let node = SpaceLensNode(url: root, isDirectory: true, size: ownSize,
+                                     ownSize: ownSize, directoryCount: 1, inaccessibleCount: 1)
+            node.isAccessDenied = true
+            return node
         }
 
-        for entry in entries {
-            guard let values = try? entry.resourceValues(forKeys: resourceKeySet) else {
-                continue
+        // A single bounded fan-out; recursive traversals do no actor hops.
+        var measurements: [Measurement] = []
+        try await withThrowingTaskGroup(of: Measurement.self) { group in
+            var pending = entries.sorted { $0.path < $1.path }.makeIterator()
+            let cap = min(4, max(2, ProcessInfo.processInfo.activeProcessorCount))
+            func submitNext() -> Bool {
+                guard let entry = pending.next() else { return false }
+                group.addTask { try Self.measure(at: entry, minNodeSize: minNodeSize, expand: true, progress: progress) }
+                return true
             }
-            let isSymlink = values.isSymbolicLink ?? false
-            let isPackage = (values.isPackage ?? false) || entry.pathExtension == "app"
-
-            // Symlink check must precede isDirectory: a symlink to a
-            // directory reports isDirectory == true and following it would
-            // double-count (or loop).
-            if !isSymlink, values.isDirectory ?? false, !isPackage {
-                children.append(try buildTree(at: entry, minNodeSize: minNodeSize,
-                                              progress: progress))
-                continue
-            }
-
-            let bytes: Int64
-            if !isSymlink, isPackage, values.isDirectory ?? false {
-                bytes = try packageSize(at: entry, progress: progress)
-            } else {
-                bytes = fileBytes(values: values, progress: progress)
-            }
-            progress.add(bytes: bytes, path: entry.path)
-
-            if bytes >= minNodeSize {
-                children.append(SpaceLensNode(url: entry, isDirectory: false,
-                                              isPackage: isPackage, size: bytes))
-            } else {
-                prunedCount += 1
-                prunedSize += bytes
+            for _ in 0..<cap { if !submitNext() { break } }
+            while let result = try await group.next() {
+                measurements.append(result)
+                _ = submitNext()
             }
         }
-
-        children.sort { $0.size > $1.size }
-        let node = SpaceLensNode(
-            url: url, isDirectory: true,
-            size: children.reduce(prunedSize) { $0 + $1.size },
-            children: children,
-            prunedCount: prunedCount, prunedSize: prunedSize
-        )
-        node.isAccessDenied = denied
+        try Task.checkCancellation()
+        let node = Self.makeDirectory(at: root, ownSize: ownSize, measurements: measurements,
+                                      minNodeSize: minNodeSize, expand: true, isPackage: false)
+        progress.record(path: root.path, force: true)
         return node
     }
 
-    /// Recursive size of a package bundle — contents counted, no child nodes.
-    private static func packageSize(at url: URL, progress: ProgressBox) throws -> Int64 {
+    private static func measure(at url: URL, minNodeSize: Int64, expand: Bool,
+                                progress: ProgressBox) throws -> Measurement {
         try Task.checkCancellation()
-        let fileManager = FileManager.default
-        var total: Int64 = 0
-        guard let entries = try? fileManager.contentsOfDirectory(
-            at: url, includingPropertiesForKeys: resourceKeys, options: []
-        ) else { return 0 }
+        guard let metadata = metadata(at: url) else {
+            progress.record(inaccessible: 1, path: url.path)
+            return Measurement(inaccessible: 1)
+        }
+        let kind = metadata.st_mode & S_IFMT
+        guard kind != S_IFLNK, !isDataless(metadata), kind == S_IFDIR || kind == S_IFREG else {
+            progress.record(skipped: 1, path: url.path)
+            return Measurement(skipped: 1)
+        }
+        guard let values = try? url.resourceValues(forKeys: resourceKeys) else {
+            progress.record(inaccessible: 1, path: url.path)
+            return Measurement(inaccessible: 1)
+        }
+        guard !isCloudOnly(values) else {
+            progress.record(skipped: 1, path: url.path)
+            return Measurement(skipped: 1)
+        }
+        guard kind != S_IFREG || progress.claim(metadata) else {
+            progress.record(skipped: 1, path: url.path)
+            return Measurement(skipped: 1)
+        }
+        let ownSize = allocatedBytes(metadata: metadata, values: values)
+        progress.record(bytes: ownSize, items: 1, path: url.path)
+        if kind == S_IFREG {
+            return Measurement(node: SpaceLensNode(url: url, isDirectory: false,
+                                                  size: ownSize, ownSize: ownSize, fileCount: 1))
+        }
+        let isPackage = values.isPackage == true || url.pathExtension == "app"
+        let entries: [URL]
+        do {
+            entries = try FileManager.default.contentsOfDirectory(
+                at: url, includingPropertiesForKeys: Array(resourceKeys), options: []
+            )
+        } catch {
+            progress.record(inaccessible: 1, path: url.path)
+            let node = SpaceLensNode(url: url, isDirectory: true, isPackage: isPackage, size: ownSize,
+                                     ownSize: ownSize, directoryCount: 1, inaccessibleCount: 1)
+            node.isAccessDenied = true
+            return Measurement(node: node)
+        }
+        var measurements: [Measurement] = []
         for entry in entries {
-            guard let values = try? entry.resourceValues(forKeys: resourceKeySet) else {
-                continue
-            }
-            if !(values.isSymbolicLink ?? false), values.isDirectory ?? false {
-                total += try packageSize(at: entry, progress: progress)
-            } else {
-                total += fileBytes(values: values, progress: progress)
-            }
+            measurements.append(try measure(at: entry, minNodeSize: minNodeSize,
+                                            expand: expand && !isPackage, progress: progress))
         }
-        return total
+        return Measurement(node: makeDirectory(at: url, ownSize: ownSize, measurements: measurements,
+                                              minNodeSize: minNodeSize, expand: expand && !isPackage,
+                                              isPackage: isPackage))
     }
 
-    /// Allocated bytes for one non-directory entry, deduplicating hard links.
-    private static func fileBytes(values: URLResourceValues,
-                                  progress: ProgressBox) -> Int64 {
-        if (values.linkCount ?? 1) > 1,
-           let identifier = values.fileResourceIdentifier as? NSObject,
-           !progress.claimHardLink(identifier) {
-            return 0
+    private static func makeDirectory(at url: URL, ownSize: Int64, measurements: [Measurement],
+                                      minNodeSize: Int64, expand: Bool, isPackage: Bool) -> SpaceLensNode {
+        var children: [SpaceLensNode] = []
+        var size = ownSize
+        var files = 0
+        var directories = 1
+        var skipped = 0
+        var inaccessible = 0
+        var prunedCount = 0
+        var prunedSize: Int64 = 0
+        for measurement in measurements {
+            skipped += measurement.skipped
+            inaccessible += measurement.inaccessible
+            guard let child = measurement.node else { continue }
+            size += child.size
+            files += child.fileCount
+            directories += child.directoryCount
+            skipped += child.skippedCount
+            inaccessible += child.inaccessibleCount
+            if expand && (child.isDirectory || child.isPackage || child.size >= minNodeSize) {
+                children.append(child)
+            } else if expand {
+                prunedCount += 1
+                prunedSize += child.size
+            }
         }
-        return Int64(values.totalFileAllocatedSize ?? values.fileAllocatedSize ?? 0)
+        children.sort {
+            $0.size == $1.size ? $0.name.localizedStandardCompare($1.name) == .orderedAscending : $0.size > $1.size
+        }
+        return SpaceLensNode(url: url, isDirectory: true, isPackage: isPackage, size: size, children: children,
+                             prunedCount: prunedCount, prunedSize: prunedSize, ownSize: ownSize,
+                             fileCount: files, directoryCount: directories,
+                             inaccessibleCount: inaccessible, skippedCount: skipped)
     }
 
-    /// Size a loose root-level entry (file, symlink, or package). Returns the
-    /// measured bytes plus a node when the entry clears the size threshold;
-    /// below the threshold the caller folds the bytes into the pruned tally.
-    private static func sizeLeaf(at url: URL, minNodeSize: Int64,
-                                 progress: ProgressBox) -> (bytes: Int64, node: SpaceLensNode?) {
-        guard let values = try? url.resourceValues(forKeys: resourceKeySet) else {
-            return (0, nil)
+    private static func metadata(at url: URL) -> stat? {
+        var metadata = stat()
+        let result = url.withUnsafeFileSystemRepresentation { path in
+            guard let path else { return Int32(-1) }
+            return lstat(path, &metadata)
         }
-        let isSymlink = values.isSymbolicLink ?? false
-        let isPackage = (values.isPackage ?? false) || url.pathExtension == "app"
-        let bytes: Int64
-        if !isSymlink, isPackage, values.isDirectory ?? false {
-            bytes = (try? packageSize(at: url, progress: progress)) ?? 0
-        } else {
-            bytes = fileBytes(values: values, progress: progress)
-        }
-        progress.add(bytes: bytes, path: url.path)
-        guard bytes >= minNodeSize else { return (bytes, nil) }
-        return (bytes, SpaceLensNode(url: url, isDirectory: false,
-                                     isPackage: isPackage, size: bytes))
+        return result == 0 ? metadata : nil
+    }
+
+    private static func allocatedBytes(metadata: stat, values: URLResourceValues) -> Int64 {
+        Int64(values.totalFileAllocatedSize ?? values.fileAllocatedSize ?? max(0, Int(metadata.st_blocks)) * 512)
+    }
+
+    private static func isDataless(_ metadata: stat) -> Bool { metadata.st_flags & UInt32(SF_DATALESS) != 0 }
+
+    private static func isCloudOnly(_ values: URLResourceValues) -> Bool {
+        values.isUbiquitousItem == true && values.ubiquitousItemDownloadingStatus != .current
+            && values.ubiquitousItemDownloadingStatus != .downloaded
     }
 }

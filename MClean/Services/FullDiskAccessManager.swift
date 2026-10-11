@@ -15,6 +15,8 @@ final class FullDiskAccessManager {
     /// and so don't register the calling app in the FDA list.
     var hasFullDiskAccess: Bool {
         let probes = [
+            FileManager.default.homeDirectoryForCurrentUser
+                .appendingPathComponent("Library/Application Support/com.apple.TCC/TCC.db").path,
             "/Library/Application Support/com.apple.TCC/TCC.db",
             FileManager.default.homeDirectoryForCurrentUser
                 .appendingPathComponent("Library/Safari/CloudTabs.db").path,
@@ -33,24 +35,13 @@ final class FullDiskAccessManager {
     /// Directories use contentsOfDirectory; files use FileHandle.
     @discardableResult
     private func canActuallyRead(path: String) -> Bool {
-        var isDir: ObjCBool = false
-        guard FileManager.default.fileExists(atPath: path, isDirectory: &isDir) else {
-            return false
-        }
-        if isDir.boolValue {
-            do {
-                _ = try FileManager.default.contentsOfDirectory(atPath: path)
-                return true
-            } catch {
-                return false
-            }
-        } else {
-            guard let handle = try? FileHandle(forReadingFrom: URL(fileURLWithPath: path)) else {
-                return false
-            }
+        // Attempt the protected operation even when a metadata lookup would
+        // say the entry is absent. TCC can hide metadata before registration.
+        if let handle = try? FileHandle(forReadingFrom: URL(fileURLWithPath: path)) {
             defer { try? handle.close() }
-            return (try? handle.read(upToCount: 1)) != nil
+            if (try? handle.read(upToCount: 1)) != nil { return true }
         }
+        return (try? FileManager.default.contentsOfDirectory(atPath: path)) != nil
     }
 
     /// Force MClean to appear in the Full Disk Access list.
@@ -79,6 +70,7 @@ final class FullDiskAccessManager {
             // FDA-only probes. Each path here is read-gated by
             // SystemPolicyAllFiles, nothing else.
             let probePaths = [
+                "\(home)/Library/Application Support/com.apple.TCC/TCC.db",
                 "/Library/Application Support/com.apple.TCC/TCC.db",
                 "\(home)/Library/Mail",
                 "\(home)/Library/Safari/CloudTabs.db",
@@ -105,19 +97,18 @@ final class FullDiskAccessManager {
     func hasFullDiskAccessInFreshProcess() -> Bool {
         let home = FileManager.default.homeDirectoryForCurrentUser.path
         let probes = [
+            "\(home)/Library/Application Support/com.apple.TCC/TCC.db",
             "/Library/Application Support/com.apple.TCC/TCC.db",
             "\(home)/Library/Safari/CloudTabs.db",
         ]
-        for path in probes where FileManager.default.fileExists(atPath: path) {
-            let process = Process()
-            process.executableURL = URL(fileURLWithPath: "/usr/bin/head")
-            process.arguments = ["-c", "1", path]
-            process.standardOutput = FileHandle.nullDevice
-            process.standardError = FileHandle.nullDevice
+        for path in probes {
             do {
-                try process.run()
-                process.waitUntilExit()
-                if process.terminationStatus == 0 { return true }
+                let result = try CommandRunner.run(
+                    executable: "/usr/bin/head",
+                    arguments: ["-c", "1", path],
+                    timeout: 2
+                )
+                if result.succeeded { return true }
             } catch {
                 continue
             }
@@ -129,14 +120,17 @@ final class FullDiskAccessManager {
     /// detached shell waits out our teardown, relaunches the same bundle,
     /// and the current instance terminates immediately.
     func relaunchApp() {
-        let bundlePath = Bundle.main.bundlePath
-            .replacingOccurrences(of: "'", with: "'\\''")
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/bin/sh")
-        process.arguments = ["-c", "sleep 0.5; /usr/bin/open '\(bundlePath)'"]
-        try? process.run()
-        DispatchQueue.main.async {
-            NSApp.terminate(nil)
+        // Positional arguments preserve spaces/quotes. Wait for actual exit:
+        // quit may be deferred while a filesystem mutation is still running.
+        process.arguments = ["-c", "while kill -0 \"$1\" 2>/dev/null; do sleep 0.2; done; exec /usr/bin/open \"$2\"",
+                             "mclean-relaunch", String(ProcessInfo.processInfo.processIdentifier), Bundle.main.bundlePath]
+        do {
+            try process.run()
+            DispatchQueue.main.async { NSApp.terminate(nil) }
+        } catch {
+            Logger.shared.log("Failed to relaunch MClean: \(error.localizedDescription)", level: .error)
         }
     }
 
@@ -161,13 +155,12 @@ final class FullDiskAccessManager {
     @discardableResult
     func resetFullDiskAccess() -> Bool {
         let bundleID = Bundle.main.bundleIdentifier ?? "com.maclife.mclean"
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: "/usr/bin/tccutil")
-        process.arguments = ["reset", "SystemPolicyAllFiles", bundleID]
         do {
-            try process.run()
-            process.waitUntilExit()
-            return process.terminationStatus == 0
+            return try CommandRunner.run(
+                executable: "/usr/bin/tccutil",
+                arguments: ["reset", "SystemPolicyAllFiles", bundleID],
+                timeout: 5
+            ).succeeded
         } catch {
             return false
         }

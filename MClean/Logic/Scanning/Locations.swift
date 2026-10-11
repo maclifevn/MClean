@@ -45,9 +45,6 @@ class Locations: ObservableObject {
             // .ssh, .aws, .kube by normalized app-name ("claude" matching
             // ".claude") and invites data loss when uninstalling unrelated
             // webapps. Scoped subdirs below are still scanned.
-            "\(home)/.config",
-            "\(home)/Documents",
-            "\(home)/Desktop",
             "\(home)/Applications",
             // User Library
             "\(home)/Library",
@@ -108,9 +105,10 @@ class Locations: ObservableObject {
             tempDir
         ])
 
-        // Dynamically append Application Support subfolders for deeper search
-        let subfolders = Locations.listAppSupportDirectories()
-        for folder in subfolders {
+        // Individual Application Support folders get one extra level of
+        // traversal for apps that nest helpers below a vendor directory.
+        // AppPathFinder de-duplicates paths already covered by ~/Library.
+        for folder in Locations.listAppSupportDirectories() {
             self.appSearch.paths.append("\(home)/Library/Application Support/\(folder)")
         }
 
@@ -153,14 +151,24 @@ class Locations: ObservableObject {
     }
 
     static func listAppSupportDirectories() -> [String] {
-        let appSupportPath = "\(home)/Library/Application Support"
-        guard let contents = try? FileManager.default.contentsOfDirectory(atPath: appSupportPath) else {
+        let appSupportURL = URL(fileURLWithPath: "\(home)/Library/Application Support")
+        let keys: [URLResourceKey] = [.isDirectoryKey, .isSymbolicLinkKey]
+        let keySet = Set(keys)
+        guard let contents = try? FileManager.default.contentsOfDirectory(
+            at: appSupportURL,
+            includingPropertiesForKeys: keys,
+            options: [.skipsHiddenFiles]
+        ) else {
             return []
         }
-        return contents.filter { item in
-            var isDir: ObjCBool = false
-            let fullPath = (appSupportPath as NSString).appendingPathComponent(item)
-            return FileManager.default.fileExists(atPath: fullPath, isDirectory: &isDir) && isDir.boolValue
+        return contents.compactMap { url in
+            guard let values = try? url.resourceValues(forKeys: keySet),
+                  values.isDirectory == true,
+                  values.isSymbolicLink != true else {
+                return nil
+            }
+            return url.lastPathComponent
         }
     }
+
 }

@@ -2,7 +2,11 @@ import Foundation
 
 actor ScanEngine {
     private let fileManager = FileManager.default
-    private let home = FileManager.default.homeDirectoryForCurrentUser.path
+    private let home: String
+
+    init(homeDirectory: URL = FileManager.default.homeDirectoryForCurrentUser) {
+        home = XcodeBuildMCPDerivedDataSupport.canonicalHomeDirectory(homeDirectory).path
+    }
 
     /// Live path reporter for the dashboard's scanning ticker. Throttled so
     /// a directory with thousands of entries doesn't flood the main actor.
@@ -34,6 +38,12 @@ actor ScanEngine {
         }
     }
 
+    enum NodeCacheManager: String, CaseIterable {
+        case npm
+        case yarn
+        case pnpm
+    }
+
     // MARK: - Public API
 
     func scanCategory(
@@ -42,32 +52,43 @@ actor ScanEngine {
     ) async -> CategoryResult {
         self.onPath = onPath
         defer { self.onPath = nil }
+        let result: CategoryResult
         switch category {
         case .smartScan:
-            return CategoryResult(category: category, items: [], totalSize: 0)
+            result = CategoryResult(category: category, items: [], totalSize: 0)
         case .systemJunk:
-            return scanSystemJunk()
+            result = scanSystemJunk()
         case .userCache:
-            return scanUserCache()
+            result = scanUserCache()
         case .aiApps:
-            return scanAIApps()
+            result = scanAIApps()
         case .mailAttachments:
-            return scanMailAttachments()
+            result = scanMailAttachments()
         case .trashBins:
-            return scanTrash()
+            result = scanTrash()
         case .largeFiles:
-            return scanLargeFiles()
+            result = scanLargeFiles()
         case .purgeableSpace:
-            return scanPurgeableSpace()
+            result = CategoryResult(category: category, items: [], totalSize: 0)
         case .xcodeJunk:
-            return scanXcodeJunk()
+            result = scanXcodeJunk()
         case .brewCache:
-            return scanBrewCache()
+            result = await scanBrewCache()
         case .nodeCache:
-            return scanNodeCache()
+            result = await scanNodeCache()
         case .dockerCache:
-            return scanDockerCache()
+            result = await scanDockerCache()
+        case .universalBinaries:
+            result = CategoryResult(category: category, items: [], totalSize: 0)
+        case .languageFiles:
+            result = CategoryResult(category: category, items: [], totalSize: 0)
         }
+        let excluded = CleanupExclusions.paths()
+        let items = result.items.filter { item in
+            !CleanupExclusions.excludes(item.path, paths: excluded)
+                && (item.isActionItem || !ProviderPaths.isProviderOwned(item.path, homeDirectory: URL(fileURLWithPath: home, isDirectory: true)))
+        }
+        return CategoryResult(category: category, items: items, totalSize: items.reduce(0) { $0 + $1.size })
     }
 
     func getDiskInfo() -> DiskInfo {
@@ -118,7 +139,7 @@ actor ScanEngine {
         ]
 
         for path in systemPaths {
-            let scanned = scanDirectory(path: path, category: .systemJunk, recursive: true, maxDepth: 3)
+            let scanned = scanDirectory(path: path, category: .systemJunk)
             items.append(contentsOf: scanned)
         }
 
@@ -128,30 +149,34 @@ actor ScanEngine {
 
     private func scanUserCache() -> CategoryResult {
         var items: [CleanableItem] = []
-        // Exclude cache roots claimed by dedicated categories to avoid double-counting.
-        let excludedRootPaths = Set([
+        // Exclude cache roots claimed by dedicated categories to avoid double-counting,
+        // plus cloud File Provider state, which lives under Caches but is a live
+        // database rather than reclaimable junk (issue #142).
+        let excludedRootPaths = Set(([
             "\(home)/Library/Caches/Homebrew",
             "\(home)/Library/Caches/com.electron.ollama",
             "\(home)/Library/Caches/ollama",
-        ].map(normalizePath))
+            "\(home)/Library/Caches/npm",
+            "\(home)/Library/Caches/Yarn",
+            "\(home)/Library/Caches/ms-playwright",
+            "\(home)/Library/Caches/node-gyp",
+            "\(home)/Library/Caches/electron",
+            "\(home)/Library/Caches/electron-builder",
+            "\(home)/Library/Caches/dev.kdrag0n.MacVirt",
+        ] + ProviderPaths.deniedRoots(homeDirectory: URL(fileURLWithPath: home, isDirectory: true))).map(normalizePath))
 
         // Dynamically enumerate ~/Library/Caches/ so every subdirectory is visible
         let cachePath = "\(home)/Library/Caches"
         let scanned = scanDirectory(
             path: cachePath,
             category: .userCache,
-            recursive: false,
-            maxDepth: 1,
             excluding: excludedRootPaths
         )
         items.append(contentsOf: scanned)
 
         // Also scan for npm/pip/yarn caches
         let devCaches = [
-            "\(home)/.npm/_cacache",
             "\(home)/.cache/pip",
-            "\(home)/.cache/yarn",
-            "\(home)/.cache/pnpm",
             "\(home)/Library/Caches/pip",
         ]
 
@@ -165,6 +190,53 @@ actor ScanEngine {
             }
         }
 
+        // Sandboxed apps keep their caches inside per-app containers, not
+        // ~/Library/Caches — on modern macOS this is where most of the
+        // "user cache" gigabytes actually live. One item per container,
+        // skipping near-empty caches (< 1 MB).
+        let containerRoots = [
+            "\(home)/Library/Containers",
+            "\(home)/Library/Group Containers",
+        ]
+        for root in containerRoots {
+            guard let containers = try? fileManager.contentsOfDirectory(atPath: root) else { continue }
+            // App containers nest caches under Data/; group containers don't.
+            let cacheSubpath = root.hasSuffix("Group Containers")
+                ? "Library/Caches"
+                : "Data/Library/Caches"
+            for container in containers {
+                let cachePath = (root as NSString)
+                    .appendingPathComponent(container)
+                    .appending("/" + cacheSubpath)
+                // Same symlink defense as scanDirectory: an app at this UID
+                // could plant Data or Data/Library as a symlink into an
+                // allow-listed root and have the target sized here and later
+                // deleted. Only accept paths that resolve to themselves.
+                let resolvedCachePath = URL(fileURLWithPath: cachePath).resolvingSymlinksInPath().path
+                guard normalizePath(resolvedCachePath) == normalizePath(cachePath) else { continue }
+                if let item = makeCleanupItem(
+                    name: "\(container) (sandbox cache)",
+                    path: cachePath,
+                    category: .userCache,
+                    minimumSize: 1024 * 1024
+                ) {
+                    items.append(item)
+                }
+            }
+        }
+
+        // Per-app HTTP cookie/response storage — one entry per app, same
+        // non-recursive shape as the top-level Caches pass above. CFNetwork
+        // keeps each native app's cookies and HSTS state here, i.e. live
+        // login sessions rather than regenerable cache, so these entries
+        // start unselected and the user opts in per app.
+        let httpStorages = scanDirectory(
+            path: "\(home)/Library/HTTPStorages",
+            category: .userCache,
+            isSelected: false
+        )
+        items.append(contentsOf: httpStorages)
+
         let uniqueItems = deduplicatedItems(items)
         let totalSize = uniqueItems.reduce(0) { $0 + $1.size }
         return CategoryResult(category: .userCache, items: uniqueItems, totalSize: totalSize)
@@ -173,41 +245,44 @@ actor ScanEngine {
     private func scanAIApps() -> CategoryResult {
         let targets = [
             CleanupTarget(
-                name: "Ollama Logs",
+                name: String(localized: "Ollama Logs"),
                 path: "\(home)/.ollama/logs"
             ),
             CleanupTarget(
-                name: "Ollama Cache",
+                name: String(localized: "Ollama Cache"),
                 path: "\(home)/Library/Caches/ollama"
             ),
             CleanupTarget(
-                name: "Ollama Electron Cache",
+                name: String(localized: "Ollama Electron Cache"),
                 path: "\(home)/Library/Caches/com.electron.ollama"
             ),
             CleanupTarget(
-                name: "Ollama WebKit Data",
+                name: String(localized: "Ollama WebKit Data"),
                 path: "\(home)/Library/WebKit/com.electron.ollama"
             ),
             CleanupTarget(
-                name: "Ollama Saved State",
+                name: String(localized: "Ollama Saved State"),
                 path: "\(home)/Library/Saved Application State/com.electron.ollama.savedState"
             ),
             CleanupTarget(
-                name: "Ollama CLI Prompt History (Optional)",
+                name: String(localized: "Ollama CLI Prompt History (Optional)"),
                 path: "\(home)/.ollama/history",
                 isSelected: false,
                 minimumSize: 0
             ),
             CleanupTarget(
-                name: "LM Studio Server Logs",
+                name: String(localized: "LM Studio Server Logs"),
                 path: "\(home)/.lmstudio/server-logs"
             ),
             CleanupTarget(
-                name: "LM Studio Conversations (Optional)",
+                name: String(localized: "LM Studio Conversations (Optional)"),
                 path: "\(home)/.lmstudio/conversations",
                 isSelected: false,
                 minimumSize: 0
             ),
+            CleanupTarget(name: String(localized: "Hugging Face downloads (Optional)"), path: "\(home)/.cache/huggingface/hub", isSelected: false),
+            CleanupTarget(name: String(localized: "Hugging Face datasets (Optional)"), path: "\(home)/.cache/huggingface/datasets", isSelected: false),
+            CleanupTarget(name: String(localized: "Hugging Face Xet cache (Optional)"), path: "\(home)/.cache/huggingface/xet", isSelected: false),
         ]
 
         let items = deduplicatedItems(targets.compactMap { target in
@@ -232,7 +307,7 @@ actor ScanEngine {
         ]
 
         for path in mailPaths {
-            let scanned = scanDirectory(path: path, category: .mailAttachments, recursive: true, maxDepth: 3)
+            let scanned = scanDirectory(path: path, category: .mailAttachments)
             items.append(contentsOf: scanned)
         }
 
@@ -244,7 +319,7 @@ actor ScanEngine {
         var items: [CleanableItem] = []
 
         let trashPath = "\(home)/.Trash"
-        let scanned = scanDirectory(path: trashPath, category: .trashBins, recursive: false, maxDepth: 1)
+        let scanned = scanDirectory(path: trashPath, category: .trashBins)
         items.append(contentsOf: scanned)
 
         let totalSize = items.reduce(0) { $0 + $1.size }
@@ -291,9 +366,10 @@ actor ScanEngine {
         ]
 
         for basePath in searchPaths {
+            guard !ProviderPaths.isProviderOwned(basePath, homeDirectory: URL(fileURLWithPath: home, isDirectory: true)) else { continue }
             guard let enumerator = fileManager.enumerator(
                 at: URL(fileURLWithPath: basePath),
-                includingPropertiesForKeys: [.fileSizeKey, .contentModificationDateKey, .isRegularFileKey],
+                includingPropertiesForKeys: Self.largeFileKeys,
                 options: enumerationOptions
             ) else { continue }
 
@@ -302,6 +378,11 @@ actor ScanEngine {
             // checkouts) would never see anything past entry 5k — the
             // scattered 100+ MB files were always past that bound.
             for case let fileURL as URL in enumerator {
+                if Task.isCancelled { break }
+                if ProviderPaths.isProviderOwned(fileURL.path, homeDirectory: URL(fileURLWithPath: home, isDirectory: true)) || FileProtection.isCloudPlaceholder(at: fileURL) {
+                    enumerator.skipDescendants()
+                    continue
+                }
                 // Prune excluded subtrees: hitting the excluded directory itself
                 // skips its whole contents; for files the call is a harmless no-op.
                 // Skip the path normalization entirely when nothing is excluded.
@@ -310,8 +391,8 @@ actor ScanEngine {
                     continue
                 }
                 report(fileURL.path)
-                guard let resourceValues = try? fileURL.resourceValues(forKeys: [.fileSizeKey, .contentModificationDateKey, .isRegularFileKey]),
-                      let isFile = resourceValues.isRegularFile, isFile,
+                guard let resourceValues = try? fileURL.resourceValues(forKeys: Self.largeFileKeySet),
+                      let isFile = resourceValues.isRegularFile, isFile, resourceValues.isSymbolicLink != true,
                       let fileSize = resourceValues.fileSize
                 else { continue }
 
@@ -336,50 +417,6 @@ actor ScanEngine {
         return CategoryResult(category: .largeFiles, items: items, totalSize: totalSize)
     }
 
-    private func scanPurgeableSpace() -> CategoryResult {
-        var items: [CleanableItem] = []
-        var totalSize: Int64 = 0
-
-        // Detect APFS purgeable space via URLResourceValues (no admin needed)
-        let diskInfo = getDiskInfo()
-        if diskInfo.purgeableSpace > 0 {
-            // Purgeable space is reclaimed via `diskutil apfs purgePurgeable /`
-            // (see CleaningEngine.purgePurgeableSpace), it is NOT a file that
-            // gets unlinked. Using "/" as the path made the UI render the root
-            // directory as the deletion target and triggered a bogus
-            // "couldn't remove /" error after cleaning. Use an empty path so
-            // the row shows no misleading filesystem location and the reveal-
-            // in-Finder action stays disabled for this entry. (See issue #112.)
-            items.append(CleanableItem(
-                name: "APFS Purgeable Space",
-                path: "",
-                size: diskInfo.purgeableSpace,
-                category: .purgeableSpace,
-                isSelected: true,
-                lastModified: nil
-            ))
-            totalSize = diskInfo.purgeableSpace
-        }
-
-        // Also list Time Machine local snapshots if any exist
-        let snapshots = getLocalSnapshots()
-        for snapshot in snapshots {
-            let snapshotSize = snapshot.size > 0 ? snapshot.size : 0
-            if snapshotSize > 0 {
-                items.append(CleanableItem(
-                    name: "TM Snapshot: \(snapshot.name)",
-                    path: snapshot.name,
-                    size: snapshotSize,
-                    category: .purgeableSpace,
-                    isSelected: false,
-                    lastModified: snapshot.date
-                ))
-            }
-        }
-
-        return CategoryResult(category: .purgeableSpace, items: items, totalSize: totalSize)
-    }
-
     private func scanXcodeJunk() -> CategoryResult {
         var items: [CleanableItem] = []
 
@@ -388,6 +425,18 @@ actor ScanEngine {
             "\(home)/Library/Developer/Xcode/Archives",
             "\(home)/Library/Developer/CoreSimulator/Caches",
             "\(home)/Library/Caches/com.apple.dt.Xcode",
+            // Per-OS symbol caches, regenerated on next device connect.
+            // These alone are often tens of GB on active dev machines.
+            "\(home)/Library/Developer/Xcode/iOS DeviceSupport",
+            "\(home)/Library/Developer/Xcode/watchOS DeviceSupport",
+            "\(home)/Library/Developer/Xcode/tvOS DeviceSupport",
+            // Simulator clones spun up by xcodebuild test runs
+            "\(home)/Library/Developer/XCTestDevices",
+            // SwiftUI preview build products
+            "\(home)/Library/Developer/Xcode/UserData/Previews",
+            // Swift Package Manager download + build caches
+            "\(home)/Library/Caches/org.swift.swiftpm",
+            "\(home)/Library/org.swift.swiftpm",
         ]
 
         for path in xcodePaths {
@@ -406,11 +455,69 @@ actor ScanEngine {
             }
         }
 
+        // XcodeBuildMCP DerivedData requires explicit user selection.
+        // Scheduled cleanup also applies age and lifecycle-lock guards.
+        let homeURL = URL(fileURLWithPath: home, isDirectory: true)
+        for discovered in XcodeBuildMCPDerivedDataSupport.discoverDerivedDataDirectories(
+            homeDirectory: homeURL,
+            fileManager: fileManager
+        ) {
+            if let item = makeCleanupItem(
+                name: discovered.name,
+                path: discovered.url.path,
+                category: .xcodeJunk,
+                isSelected: false
+            ) {
+                items.append(item)
+            }
+        }
+
+        // Downloaded simulator runtimes (often multi-GB each). Listed via
+        // `xcrun simctl runtime list -j` and deleted via
+        // `xcrun simctl runtime delete <id>` — not a plain filesystem unlink,
+        // so paths use the simctl-runtime: prefix (see CleaningEngine).
+        // Runtime downloads are always opt-in because restoring one requires
+        // downloading multiple gigabytes again.
+        items.append(contentsOf: scanSimulatorRuntimes())
+
         let totalSize = items.reduce(0) { $0 + $1.size }
         return CategoryResult(category: .xcodeJunk, items: items, totalSize: totalSize)
     }
 
-    private func scanBrewCache() -> CategoryResult {
+    /// Enumerate installed simulator runtime disk images via simctl.
+    /// When `xcrun` is missing (no Xcode / CLT), returns an empty list —
+    /// Xcode Junk still surfaces DerivedData and the rest of the filesystem
+    /// targets; runtime rows are simply omitted.
+    private func scanSimulatorRuntimes() -> [CleanableItem] {
+        guard SimulatorRuntimeSupport.isXcrunAvailable() else {
+            Logger.shared.log(SimulatorRuntimeSupport.missingXcrunMessage, level: .info)
+            return []
+        }
+        guard let runtimes = listSimulatorRuntimes() else { return [] }
+        let items = SimulatorRuntimeSupport.makeCleanableItems(from: runtimes)
+        for item in items {
+            report(item.name)
+        }
+        return items
+    }
+
+    /// Parse `xcrun simctl runtime list -j` into per-image rows.
+    private func listSimulatorRuntimes() -> [SimulatorRuntimeSupport.RuntimeInfo]? {
+        let result = SimulatorRuntimeSupport.runXcrun(["simctl", "runtime", "list", "-j"])
+        guard result.status == 0, !result.stdout.isEmpty else {
+            if !result.stderr.isEmpty {
+                Logger.shared.log("simctl runtime list failed: \(result.stderr)", level: .warning)
+            }
+            return nil
+        }
+        guard let runtimes = SimulatorRuntimeSupport.parseRuntimeListJSON(result.stdout) else {
+            Logger.shared.log("simctl runtime list: could not parse JSON", level: .warning)
+            return nil
+        }
+        return runtimes
+    }
+
+    private func scanBrewCache() async -> CategoryResult {
         var items: [CleanableItem] = []
 
         // Default Homebrew download cache
@@ -435,22 +542,19 @@ actor ScanEngine {
         var detectedCustomCache = false
         for brewBin in brewBinPaths {
             guard fileManager.fileExists(atPath: brewBin) else { continue }
-            let task = Process()
-            task.executableURL = URL(fileURLWithPath: brewBin)
-            task.arguments = ["--cache"]
             var sanitizedEnv = ProcessInfo.processInfo.environment
             for key in Array(sanitizedEnv.keys) where key.hasPrefix("HOMEBREW_") {
                 sanitizedEnv.removeValue(forKey: key)
             }
-            task.environment = sanitizedEnv
-            let pipe = Pipe()
-            task.standardOutput = pipe
-            task.standardError = Pipe()
             do {
-                try task.run()
-                task.waitUntilExit()
-                let data = pipe.fileHandleForReading.readDataToEndOfFile()
-                if let output = String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines),
+                let result = try await BrewProcessRunner.run(
+                    executableURL: URL(fileURLWithPath: brewBin),
+                    arguments: ["--cache"],
+                    timeout: 10,
+                    environment: sanitizedEnv
+                )
+                if result.status == 0,
+                   let output = String(data: result.stdout, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines),
                    !output.isEmpty {
                     let normalized = normalizePath(output)
                     let isKnown = knownBrewRoots.contains { root in
@@ -465,6 +569,8 @@ actor ScanEngine {
                     }
                     detectedCustomCache = true
                 }
+            } catch is CancellationError {
+                return CategoryResult(category: .brewCache, items: items, totalSize: 0)
             } catch {
                 Logger.shared.log("Failed to run \(brewBin) --cache: \(error.localizedDescription)", level: .warning)
             }
@@ -495,25 +601,22 @@ actor ScanEngine {
         return CategoryResult(category: .brewCache, items: items, totalSize: totalSize)
     }
 
-    private func scanNodeCache() -> CategoryResult {
-        // Each entry is `(displayName, defaultPath, optional CLI for cache-dir
-        // detection)`. The CLI invocation overrides `defaultPath` if the user
-        // has set a custom location (e.g. via `npm config set cache`).
+    private func scanNodeCache() async -> CategoryResult {
         struct ManagerCache {
             let name: String
-            let defaultPath: String
+            let manager: NodeCacheManager
             let detectionCommand: (cli: String, args: [String])?
         }
 
         let managers: [ManagerCache] = [
             ManagerCache(
-                name: "npm cache",
-                defaultPath: "\(home)/.npm",
+                name: String(localized: "npm cache"),
+                manager: .npm,
                 detectionCommand: (cli: "npm", args: ["config", "get", "cache"])
             ),
             ManagerCache(
-                name: "yarn classic cache",
-                defaultPath: "\(home)/Library/Caches/Yarn",
+                name: String(localized: "yarn classic cache"),
+                manager: .yarn,
                 detectionCommand: (cli: "yarn", args: ["cache", "dir"])
             ),
             // Yarn Berry / v2+ uses a per-project .yarn/cache. We don't try to
@@ -521,8 +624,8 @@ actor ScanEngine {
             // touched by a system cleaner. The classic cache above remains the
             // global, safe-to-clean location.
             ManagerCache(
-                name: "pnpm content-addressable store",
-                defaultPath: "\(home)/Library/pnpm/store",
+                name: String(localized: "pnpm content-addressable store"),
+                manager: .pnpm,
                 detectionCommand: (cli: "pnpm", args: ["store", "path"])
             ),
         ]
@@ -539,18 +642,33 @@ actor ScanEngine {
         ]
 
         for manager in managers {
-            var paths: [String] = []
-            paths.append(manager.defaultPath)
+            if Task.isCancelled { break }
+            var paths = Self.approvedNodeCacheRoots(for: manager.manager, home: home)
+                .compactMap {
+                    Self.validatedNodeCachePath($0, manager: manager.manager, home: home)
+                }
 
             if let cmd = manager.detectionCommand,
                let cliPath = locateExecutable(named: cmd.cli, searchPaths: cliSearchPaths),
-               let detected = runCommandReadingStdout(executable: cliPath, args: cmd.args) {
-                let normalized = detected.trimmingCharacters(in: .whitespacesAndNewlines)
-                if !normalized.isEmpty,
-                   !paths.map(normalizePath).contains(normalizePath(normalized)) {
-                    paths.append(normalized)
+               let detected = await runCommandReadingStdout(executable: cliPath, args: cmd.args) {
+                if let validated = Self.validatedNodeCachePath(
+                    detected,
+                    manager: manager.manager,
+                    home: home
+                ) {
+                    if !paths.contains(validated) {
+                        paths.append(validated)
+                    }
+                } else {
+                    Logger.shared.log(
+                        "Refusing untrusted \(manager.manager.rawValue) cache path",
+                        level: .warning
+                    )
                 }
             }
+
+            if Task.isCancelled { break }
+            paths = Self.prunedNodeCachePaths(paths)
 
             for path in paths {
                 guard fileManager.fileExists(atPath: path) else { continue }
@@ -567,8 +685,85 @@ actor ScanEngine {
             }
         }
 
-        let totalSize = items.reduce(0) { $0 + $1.size }
-        return CategoryResult(category: .nodeCache, items: items, totalSize: totalSize)
+        let toolCaches: [(String, String)] = [
+            ("Puppeteer", ".cache/puppeteer"),
+            ("Playwright", ".cache/ms-playwright"),
+            ("Playwright", "Library/Caches/ms-playwright"),
+            ("node-gyp", ".cache/node-gyp"),
+            ("node-gyp", "Library/Caches/node-gyp"),
+            ("Electron", "Library/Caches/electron"),
+            ("Electron Builder", "Library/Caches/electron-builder"),
+        ]
+        items.append(contentsOf: toolCaches.compactMap { name, relativePath in
+            makeCleanupItem(name: name, path: "\(home)/\(relativePath)", category: .nodeCache)
+        })
+        let unique = deduplicatedItems(items)
+        return CategoryResult(category: .nodeCache, items: unique, totalSize: unique.reduce(0) { $0 + $1.size })
+    }
+
+    nonisolated static func approvedNodeCacheRoots(
+        for manager: NodeCacheManager,
+        home: String
+    ) -> [String] {
+        let normalizedHome = (home as NSString).standardizingPath
+        switch manager {
+        case .npm:
+            return [
+                "\(normalizedHome)/.npm",
+                "\(normalizedHome)/Library/Caches/npm",
+            ]
+        case .yarn:
+            return [
+                "\(normalizedHome)/Library/Caches/Yarn",
+                "\(normalizedHome)/.cache/yarn",
+            ]
+        case .pnpm:
+            return [
+                "\(normalizedHome)/Library/pnpm/store",
+                "\(normalizedHome)/.local/share/pnpm/store",
+                "\(normalizedHome)/.pnpm-store",
+                "\(normalizedHome)/.cache/pnpm",
+            ]
+        }
+    }
+
+    nonisolated static func validatedNodeCachePath(
+        _ candidate: String,
+        manager: NodeCacheManager,
+        home: String
+    ) -> String? {
+        let trimmed = candidate.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty,
+              trimmed.hasPrefix("/"),
+              !trimmed.unicodeScalars.contains(where: CharacterSet.controlCharacters.contains)
+        else { return nil }
+
+        let standardized = (trimmed as NSString).standardizingPath
+        let resolved = URL(fileURLWithPath: standardized, isDirectory: true)
+            .resolvingSymlinksInPath()
+            .standardizedFileURL.path
+        let approvedRoots = approvedNodeCacheRoots(for: manager, home: home)
+            .map { ($0 as NSString).standardizingPath }
+
+        guard approvedRoots.contains(where: { root in
+            resolved == root || resolved.hasPrefix(root + "/")
+        }) else { return nil }
+
+        return resolved
+    }
+
+    nonisolated static func prunedNodeCachePaths(_ paths: [String]) -> [String] {
+        var kept: [String] = []
+        for path in paths.sorted(by: {
+            if $0.count != $1.count { return $0.count < $1.count }
+            return $0.localizedStandardCompare($1) == .orderedAscending
+        }) {
+            if kept.contains(where: { path == $0 || path.hasPrefix($0 + "/") }) {
+                continue
+            }
+            kept.append(path)
+        }
+        return kept
     }
 
     // -- Process helpers (used by scanNodeCache) --
@@ -593,26 +788,24 @@ actor ScanEngine {
         return nil
     }
 
-    private func runCommandReadingStdout(executable: String, args: [String]) -> String? {
-        let task = Process()
-        task.executableURL = URL(fileURLWithPath: executable)
-        task.arguments = args
-        let pipe = Pipe()
-        task.standardOutput = pipe
-        task.standardError = Pipe()
+    private func runCommandReadingStdout(executable: String, args: [String]) async -> String? {
         do {
-            try task.run()
-            task.waitUntilExit()
+            let result = try await BrewProcessRunner.run(
+                executableURL: URL(fileURLWithPath: executable),
+                arguments: args,
+                timeout: 10
+            )
+            guard result.status == 0 else { return nil }
+            return String(data: result.stdout, encoding: .utf8)
+        } catch is CancellationError {
+            return nil
         } catch {
             Logger.shared.log("\(executable) \(args.joined(separator: " ")) failed: \(error.localizedDescription)", level: .warning)
             return nil
         }
-        guard task.terminationStatus == 0 else { return nil }
-        let data = pipe.fileHandleForReading.readDataToEndOfFile()
-        return String(data: data, encoding: .utf8)
     }
 
-    private func scanDockerCache() -> CategoryResult {
+    private func scanDockerCache() async -> CategoryResult {
         var items: [CleanableItem] = []
 
         // Docker Desktop on macOS keeps its VM disk + caches under
@@ -632,6 +825,14 @@ actor ScanEngine {
             "\(home)/.docker/cli-plugins/.cache",
             // Buildx / containerd inline cache
             "\(home)/.docker/buildx/cache",
+            // OrbStack (Docker Desktop alternative) keeps its daemon logs and
+            // caches outside ~/Library/Containers. The VM data disk itself
+            // (~/.orbstack/data) is intentionally NOT listed — image/container
+            // space inside the VM is only reclaimable via `docker system
+            // prune`, surfaced as the virtual entry below.
+            "\(home)/.orbstack/log",
+            "\(home)/Library/Caches/dev.kdrag0n.MacVirt",
+            "\(home)/Library/Logs/OrbStack",
         ]
 
         for path in dockerDataDirs {
@@ -648,17 +849,23 @@ actor ScanEngine {
             ))
         }
 
-        // If the `docker` CLI is available, surface reclaimable space
-        // reported by `docker system df` as a single virtual entry.
-        // We don't try to delete it directly — the user runs
-        // `docker system prune` themselves, which is the safe path.
-        // We just show how much they can recover.
+        // If the `docker` CLI is available and the daemon answers, surface
+        // reclaimable space reported by `docker system df` as a single
+        // virtual entry. Cleaning it runs `docker system prune -f` (see
+        // CleaningEngine.pruneDockerSystem) — stopped containers, dangling
+        // images, unused networks, and build cache; running containers and
+        // tagged images are untouched. The empty path mirrors the purgeable-
+        // space convention: this is an action, not a file unlink, so the UI
+        // must not offer reveal-in-Finder or attempt removeItem on it.
+        // Works for both Docker Desktop and OrbStack (both ship a docker CLI
+        // at these locations).
         let dockerBinPaths = ["/usr/local/bin/docker", "/opt/homebrew/bin/docker"]
         for dockerBin in dockerBinPaths where fileManager.fileExists(atPath: dockerBin) {
-            if let reclaimable = reclaimableDockerSpace(dockerBin: dockerBin), reclaimable > 0 {
+            if Task.isCancelled { break }
+            if let reclaimable = await reclaimableDockerSpace(dockerBin: dockerBin), reclaimable > 0 {
                 items.append(CleanableItem(
-                    name: "Reclaimable (run `docker system prune -af`)",
-                    path: dockerBin,
+                    name: String(localized: "Docker prune (stopped containers, dangling images, build cache)"),
+                    path: CleanableItem.dockerPrunePath,
                     size: reclaimable,
                     category: .dockerCache,
                     isSelected: false,
@@ -675,23 +882,23 @@ actor ScanEngine {
     /// Sum the reclaimable bytes reported by `docker system df --format json`.
     /// Returns nil when Docker isn't running or the command fails — callers
     /// should treat that as "no reclaimable info available", not as an error.
-    private func reclaimableDockerSpace(dockerBin: String) -> Int64? {
-        let task = Process()
-        task.executableURL = URL(fileURLWithPath: dockerBin)
-        task.arguments = ["system", "df", "--format", "{{.Reclaimable}}"]
-        let stdoutPipe = Pipe()
-        task.standardOutput = stdoutPipe
-        task.standardError = Pipe()
+    private func reclaimableDockerSpace(dockerBin: String) async -> Int64? {
+        let result: BrewProcessOutput
         do {
-            try task.run()
-            task.waitUntilExit()
+            result = try await BrewProcessRunner.run(
+                executableURL: URL(fileURLWithPath: dockerBin),
+                arguments: ["system", "df", "--format", "{{.Reclaimable}}"],
+                timeout: 10
+            )
+        } catch is CancellationError {
+            return nil
         } catch {
             Logger.shared.log("docker system df failed: \(error.localizedDescription)", level: .warning)
             return nil
         }
-        guard task.terminationStatus == 0 else { return nil }
-        let data = stdoutPipe.fileHandleForReading.readDataToEndOfFile()
-        guard let output = String(data: data, encoding: .utf8) else { return nil }
+        guard result.status == 0,
+              let output = String(data: result.stdout, encoding: .utf8)
+        else { return nil }
         // Each line looks like e.g. "1.234GB (45%)" — parse the leading number.
         var total: Int64 = 0
         for line in output.split(separator: "\n") {
@@ -730,8 +937,7 @@ actor ScanEngine {
     private func scanDirectory(
         path: String,
         category: CleaningCategory,
-        recursive: Bool,
-        maxDepth: Int,
+        isSelected: Bool = true,
         excluding excludedPaths: Set<String> = []
     ) -> [CleanableItem] {
         var items: [CleanableItem] = []
@@ -749,9 +955,10 @@ actor ScanEngine {
                 options: []
             )
             for entryURL in contents {
+                if Task.isCancelled { break }
                 let fullPath = entryURL.path
                 report(fullPath)
-                if excludedPaths.contains(normalizePath(fullPath)) {
+                if ProviderPaths.isProviderOwned(fullPath, homeDirectory: URL(fileURLWithPath: home, isDirectory: true)) || excludedPaths.contains(normalizePath(fullPath)) {
                     continue
                 }
 
@@ -762,6 +969,7 @@ actor ScanEngine {
                 if values.isSymbolicLink ?? false { continue }
 
                 let name = entryURL.lastPathComponent
+                if FileProtection.isProtectedFromDeletion(path: fullPath) { continue }
                 if values.isDirectory ?? false {
                     let size = directorySize(path: fullPath)
                     if size > 1024 { // Skip tiny entries
@@ -770,18 +978,19 @@ actor ScanEngine {
                             path: fullPath,
                             size: size,
                             category: category,
-                            isSelected: true,
+                            isSelected: isSelected,
                             lastModified: values.contentModificationDate
                         ))
                     }
                 } else {
-                    if let size = values.fileSize, size > 1024 {
+                    let size = values.totalFileAllocatedSize ?? values.fileAllocatedSize ?? values.fileSize
+                    if let size, size > 1024 {
                         items.append(CleanableItem(
                             name: name,
                             path: fullPath,
                             size: Int64(size),
                             category: category,
-                            isSelected: true,
+                            isSelected: isSelected,
                             lastModified: values.contentModificationDate
                         ))
                     }
@@ -797,9 +1006,16 @@ actor ScanEngine {
     /// Prefetch keys for scanDirectory — declared once so neither the array
     /// nor the Set is rebuilt per directory or per entry.
     private static let scanEntryKeys: [URLResourceKey] = [
-        .isDirectoryKey, .isSymbolicLinkKey, .fileSizeKey, .contentModificationDateKey,
+        .isDirectoryKey, .isSymbolicLinkKey, .fileSizeKey,
+        .totalFileAllocatedSizeKey, .fileAllocatedSizeKey,
+        .contentModificationDateKey,
     ]
     private static let scanEntryKeySet = Set(scanEntryKeys)
+
+    private static let largeFileKeys: [URLResourceKey] = [
+        .fileSizeKey, .contentModificationDateKey, .isRegularFileKey, .isSymbolicLinkKey,
+    ]
+    private static let largeFileKeySet = Set(largeFileKeys)
 
     private func makeCleanupItem(
         name: String,
@@ -809,6 +1025,9 @@ actor ScanEngine {
         minimumSize: Int64 = 1024
     ) -> CleanableItem? {
         report(path)
+        guard !ProviderPaths.isProviderOwned(path, homeDirectory: URL(fileURLWithPath: home, isDirectory: true)),
+              !FileProtection.isProtectedFromDeletion(path: path),
+              (try? URL(fileURLWithPath: path).resourceValues(forKeys: [.isSymbolicLinkKey]))?.isSymbolicLink != true else { return nil }
         var isDirectory: ObjCBool = false
         guard fileManager.fileExists(atPath: path, isDirectory: &isDirectory),
               fileManager.isReadableFile(atPath: path) else { return nil }
@@ -860,185 +1079,48 @@ actor ScanEngine {
 
     private func directorySize(path: String) -> Int64 {
         var totalSize: Int64 = 0
+        var count = 0
 
+        // errorHandler returns true so unreadable entries are skipped
+        // instead of aborting the walk partway through the tree.
         guard let enumerator = fileManager.enumerator(
             at: URL(fileURLWithPath: path),
-            includingPropertiesForKeys: [.fileSizeKey, .isRegularFileKey],
-            options: [.skipsHiddenFiles]
+            includingPropertiesForKeys: Self.directorySizeKeys,
+            options: [],
+            errorHandler: { _, _ in true }
         ) else { return 0 }
 
-        var count = 0
+        // No entry cap. A 10k cap was here previously and made huge trees
+        // like Xcode DerivedData (millions of files) report a fraction of
+        // their real size. report() is throttled, so display stays cheap.
+        // A DerivedData/DeviceSupport walk can hold this loop for minutes,
+        // so honor task cancellation to let an aborted scan stop promptly.
         for case let fileURL as URL in enumerator {
             count += 1
-            if count > 10000 { break } // Safety limit for very large directories
+            if count.isMultiple(of: 256),
+               withUnsafeCurrentTask(body: { $0?.isCancelled ?? false }) {
+                break
+            }
 
             report(fileURL.path)
             // Same key set as the enumerator prefetch, resolved from the URL
             // cache; the static Set avoids a per-file allocation.
             guard let values = try? fileURL.resourceValues(forKeys: Self.directorySizeKeySet),
-                  let isFile = values.isRegularFile, isFile,
-                  let size = values.fileSize else { continue }
+                  let isFile = values.isRegularFile, isFile, values.isSymbolicLink != true else { continue }
+            let size = values.totalFileAllocatedSize ?? values.fileAllocatedSize ?? values.fileSize ?? 0
             totalSize += Int64(size)
         }
 
         return totalSize
     }
 
-    private static let directorySizeKeySet: Set<URLResourceKey> = [.fileSizeKey, .isRegularFileKey]
+    private static let directorySizeKeys: [URLResourceKey] = [
+        .totalFileAllocatedSizeKey, .fileAllocatedSizeKey, .fileSizeKey, .isRegularFileKey, .isSymbolicLinkKey,
+    ]
+    private static let directorySizeKeySet = Set(directorySizeKeys)
 
     private func fileModDate(path: String) -> Date? {
         try? fileManager.attributesOfItem(atPath: path)[.modificationDate] as? Date
     }
 
-    // MARK: - Purgeable Space Helpers
-
-    struct SnapshotInfo {
-        let name: String
-        let size: Int64
-        let date: Date?
-    }
-
-    /// Get local Time Machine snapshots and their sizes
-    private func getLocalSnapshots() -> [SnapshotInfo] {
-        var snapshots: [SnapshotInfo] = []
-        lazy var snapshotSizes = apfsSnapshotSizes()
-
-        let task = Process()
-        task.executableURL = URL(fileURLWithPath: "/usr/bin/tmutil")
-        task.arguments = ["listlocalsnapshots", "/"]
-        let pipe = Pipe()
-        task.standardOutput = pipe
-        task.standardError = Pipe()
-
-        do {
-            try task.run()
-            task.waitUntilExit()
-            let data = pipe.fileHandleForReading.readDataToEndOfFile()
-            guard let output = String(data: data, encoding: .utf8) else { return [] }
-
-            // Parse snapshot names (format: com.apple.TimeMachine.2026-04-08-123456.local)
-            let dateFormatter = DateFormatter()
-            dateFormatter.dateFormat = "yyyy-MM-dd-HHmmss"
-
-            for line in output.components(separatedBy: "\n") {
-                let trimmed = line.trimmingCharacters(in: .whitespaces)
-                guard !trimmed.isEmpty, trimmed.contains("TimeMachine") else { continue }
-
-                // Extract date from snapshot name
-                var snapshotDate: Date?
-                let parts = trimmed.components(separatedBy: ".")
-                for part in parts {
-                    if let date = dateFormatter.date(from: part) {
-                        snapshotDate = date
-                        break
-                    }
-                }
-
-                // Look up the size from the one-shot APFS listing. The lazy
-                // var means diskutil runs at most once per scan instead of
-                // once per snapshot (previously O(n) subprocess spawns, each
-                // parsing the same plist).
-                let sizeBytes = snapshotSizes[trimmed] ?? 0
-
-                if sizeBytes > 0 {
-                    snapshots.append(SnapshotInfo(
-                        name: trimmed,
-                        size: sizeBytes,
-                        date: snapshotDate
-                    ))
-                }
-            }
-        } catch {
-            Logger.shared.log("tmutil listlocalsnapshots failed: \(error.localizedDescription)", level: .info)
-        }
-
-        return snapshots
-    }
-
-    /// One-shot APFS snapshot listing → [snapshot name: data size]. Runs
-    /// diskutil exactly once; callers look sizes up from the returned map.
-    private func apfsSnapshotSizes() -> [String: Int64] {
-        let task = Process()
-        task.executableURL = URL(fileURLWithPath: "/usr/sbin/diskutil")
-        task.arguments = ["apfs", "listSnapshots", "/", "-plist"]
-        let pipe = Pipe()
-        task.standardOutput = pipe
-        task.standardError = Pipe()
-
-        do {
-            try task.run()
-            task.waitUntilExit()
-            let data = pipe.fileHandleForReading.readDataToEndOfFile()
-            guard let plist = try? PropertyListSerialization.propertyList(from: data, format: nil) as? [String: Any],
-                  let snapshots = plist["Snapshots"] as? [[String: Any]] else {
-                Logger.shared.log("Could not parse APFS snapshot plist", level: .info)
-                return [:]
-            }
-
-            var sizes: [String: Int64] = [:]
-            for snapshot in snapshots {
-                if let snapshotName = snapshot["SnapshotName"] as? String,
-                   let dataSize = snapshot["DataSize"] as? Int64 {
-                    sizes[snapshotName] = dataSize
-                }
-            }
-            return sizes
-        } catch {
-            Logger.shared.log("diskutil apfs listSnapshots failed: \(error.localizedDescription)", level: .warning)
-            return [:]
-        }
-    }
-
-    /// Calculate total local snapshot size from disk usage difference
-    private func getLocalSnapshotSize() -> Int64 {
-        // The difference between "Volume Used Space" visible to the filesystem
-        // and actual container usage can indicate snapshot overhead.
-        // However, without root access, we can only check if tmutil reports snapshots.
-
-        let task = Process()
-        task.executableURL = URL(fileURLWithPath: "/usr/bin/tmutil")
-        task.arguments = ["listlocalsnapshots", "/"]
-        let pipe = Pipe()
-        task.standardOutput = pipe
-        task.standardError = Pipe()
-
-        do {
-            try task.run()
-            task.waitUntilExit()
-            let data = pipe.fileHandleForReading.readDataToEndOfFile()
-            guard let output = String(data: data, encoding: .utf8) else { return 0 }
-
-            let snapshotCount = output.components(separatedBy: "\n")
-                .filter { $0.contains("TimeMachine") || $0.contains("com.apple") }
-                .count
-
-            if snapshotCount == 0 { return 0 }
-
-            // Check if system reports purgeable via newer diskutil
-            // On systems that support it, "Purgeable Space" appears in diskutil info
-            let diskTask = Process()
-            diskTask.executableURL = URL(fileURLWithPath: "/usr/sbin/diskutil")
-            diskTask.arguments = ["info", "-plist", "/"]
-            let diskPipe = Pipe()
-            diskTask.standardOutput = diskPipe
-            diskTask.standardError = Pipe()
-            try diskTask.run()
-            diskTask.waitUntilExit()
-
-            let diskData = diskPipe.fileHandleForReading.readDataToEndOfFile()
-            if let plist = try? PropertyListSerialization.propertyList(from: diskData, format: nil) as? [String: Any],
-               let purgeable = plist["APFSContainerFree"] as? Int64,
-               let volumeFree = plist["FreeSpace"] as? Int64 {
-                // Purgeable is roughly the difference (snapshots that can be freed)
-                let purgeableEstimate = max(0, volumeFree - purgeable)
-                if purgeableEstimate > 10 * 1024 * 1024 { // Only report if > 10 MB
-                    return purgeableEstimate
-                }
-            }
-        } catch {
-            Logger.shared.log("Purgeable space detection failed: \(error.localizedDescription)", level: .warning)
-        }
-
-        return 0
-    }
 }

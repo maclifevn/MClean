@@ -9,6 +9,7 @@ enum AppSection: Hashable {
     case apps
     case orphans
     case spaceLens
+    case duplicates, similarPhotos, protection, performance, appUpdates
     case cleaning(CleaningCategory)
 }
 
@@ -58,7 +59,7 @@ final class AppState: ObservableObject {
         _ app: InstalledApp,
         _ locations: Locations,
         _ completion: @escaping (Set<URL>) -> Void
-    ) -> Void
+    ) -> (() -> Void)?
 
     // MARK: - Scan / Clean State
 
@@ -67,7 +68,9 @@ final class AppState: ObservableObject {
     @Published var categoryResults: [CleaningCategory: CategoryResult] = [:]
     @Published var diskInfo = DiskInfo()
     @Published var totalJunkSize: Int64 = 0
-    @Published var totalFreedSpace: Int64 = 0
+    @Published var lastCleanupHadFailures = false
+    @Published var showUpdateSettings = false
+    @Published var totalProcessedSpace: Int64 = 0
     /// Scan/clean progress values. Deliberately NOT `@Published` fields on
     /// AppState — they tick frequently during scans/cleans and only the
     /// dashboard hero observes them (same isolation pattern as `scanTicker`).
@@ -91,8 +94,8 @@ final class AppState: ObservableObject {
     @Published var fdaBannerDismissed: Bool = false
     @Published var cleanError: String?
     /// True when the most recent clean error is rooted in a TCC/FDA refusal
-    /// (i.e. items survived even the admin pass). MainWindow uses this to
-    /// route the user into the PermissionSheet instead of the generic alert.
+    /// rather than an invalid/unsafe path. MainWindow uses this to route the
+    /// user into the PermissionSheet instead of the generic alert.
     @Published var cleanErrorIsFDAFixable: Bool = false
     /// Items that survived the most recent clean attempt — used to re-run the
     /// operation after the user grants Full Disk Access without forcing them
@@ -109,6 +112,7 @@ final class AppState: ObservableObject {
     @Published var isSearchingOrphans: Bool = false
     @Published var isLoadingApps: Bool = false
     @Published var isScanningAppFiles: Bool = false
+    @Published var isRemovingAppFiles: Bool = false
     @Published var removalError: String?
     @Published var removalNeedsFullDiskAccess = false
     /// Snapshot of the URLs that failed the most recent uninstall due to a
@@ -137,6 +141,16 @@ final class AppState: ObservableObject {
     private let cleaningEngine = CleaningEngine()
     private let locationsProvider: () -> Locations
     private let appFileScanner: AppFileScanner
+    private var cancelAppFileScan: (() -> Void)?
+    /// Invalidates callbacks from an older app-file scan when the user changes
+    /// selection before that scan finishes. Without this, app A could finish
+    /// after app B and replace B's visible/selected files with A's results.
+    private var appFileScanGeneration = UUID()
+    private var scanTask: Task<Void, Never>?
+    private var scanGeneration = UUID()
+    private var cleanupGeneration = UUID()
+    @Published private(set) var scanWasCancelled = false
+    @Published private(set) var lastScanDate: Date?
 
     // MARK: - Computed
 
@@ -168,10 +182,12 @@ final class AppState: ObservableObject {
     init(
         performStartupTasks: Bool = true,
         locationsProvider: @escaping () -> Locations = Locations.init,
-        appFileScanner: @escaping AppFileScanner = AppState.defaultAppFileScanner
+        appFileScanner: AppFileScanner? = nil
     ) {
         self.locationsProvider = locationsProvider
-        self.appFileScanner = appFileScanner
+        // Resolve the default on the main actor; older Swift compilers evaluate
+        // default arguments outside the initializer's actor context.
+        self.appFileScanner = appFileScanner ?? AppState.defaultAppFileScanner
 
         // Listen for right-click "Uninstall with MClean" hand-offs from the
         // Finder Services handler in AppDelegate.
@@ -220,6 +236,7 @@ final class AppState: ObservableObject {
     /// repeatedly doesn't re-walk. Runs at `.utility` QoS so it always yields
     /// disk to a user-initiated Smart Scan running at the same time.
     func loadInstalledApps() {
+        guard !isLoadingApps else { return }
         isLoadingApps = true
         Task.detached(priority: .utility) {
             let start = Date()
@@ -266,22 +283,51 @@ final class AppState: ObservableObject {
     }
 
     func scanForAppFiles(_ app: InstalledApp) {
+        cancelAppFileScan?()
+        cancelAppFileScan = nil
+        let generation = UUID()
+        appFileScanGeneration = generation
         discoveredFiles = []
         selectedFiles = []
         isScanningAppFiles = true
         let locations = locationsProvider()
         appFileScanLocationCount = locations.appSearch.paths.count
-        appFileScanner(app, locations) { [weak self] urls in
+        var completedSynchronously = false
+        let cancellation = appFileScanner(app, locations) { [weak self] urls in
+            completedSynchronously = true
             guard let self else { return }
+            guard self.appFileScanGeneration == generation else {
+                Logger.shared.log("Discarded stale related-file scan for \(app.appName)", level: .debug)
+                return
+            }
             let sorted = urls.sorted { $0.path < $1.path }
             self.discoveredFiles = sorted
-            self.selectedFiles = urls
+            self.selectedFiles = Set(urls.filter { self.shouldAutoSelectUninstallPath($0, app: app) })
             self.isScanningAppFiles = false
             self.appFileScanLocationCount = 0
+            self.cancelAppFileScan = nil
+        }
+        cancelAppFileScan = completedSynchronously ? nil : cancellation
+    }
+
+    /// Fuzzy matches in user-managed/system-wide tool locations need explicit
+    /// review. Exact app bundle selection remains automatic, while supporting
+    /// files in standard Library locations keep the convenient default.
+    private func shouldAutoSelectUninstallPath(_ url: URL, app: InstalledApp) -> Bool {
+        let path = url.standardizedFileURL.path
+        if path == app.path.standardizedFileURL.path { return true }
+
+        let home = FileManager.default.homeDirectoryForCurrentUser.path
+        let manualReviewRoots = [
+            "\(home)/Documents", "\(home)/Desktop", "/Users/Shared",
+            "/usr/local", "/opt/homebrew",
+        ]
+        return !manualReviewRoots.contains { root in
+            path == root || path.hasPrefix(root + "/")
         }
     }
 
-    func removeSelectedFiles() {
+    func removeSelectedFiles(confirmedURLs: Set<URL>? = nil) {
         // Re-entrance guard: if a previous removal is still resolving and
         // the FDA sheet/retry hasn't finished, a second call would race-
         // overwrite `lastFailedRemovalURLs` before the first batch's retry
@@ -291,19 +337,20 @@ final class AppState: ObservableObject {
         // would pass the guard while the coordinator is still polling.
         // PermissionCoordinator.isRequesting covers the full sheet-open +
         // retry-pending span.
-        guard !removalNeedsFullDiskAccess,
+        guard !isRemovingAppFiles,
+              !removalNeedsFullDiskAccess,
               !PermissionCoordinator.shared.isRequesting else {
-            Logger.shared.log("Refused duplicate removeSelectedFiles while FDA flow is active", level: .info)
+            Logger.shared.log("Refused duplicate removeSelectedFiles while a removal is active", level: .info)
             return
         }
         // Safety guard: never allow a high-risk home dotpath (listed in
         // Conditions.swift) to be trashed no matter how it ended up in the
         // selection. Catches selection-time additions that slipped past the
         // scanner-side filters.
-        let allURLs = Array(selectedFiles)
+        let allURLs = Array(confirmedURLs ?? selectedFiles)
         let (urls, blocked): ([URL], [URL]) = allURLs.reduce(into: ([], [])) { acc, url in
             let resolved = url.resolvingSymlinksInPath().path
-            let isBlocked = highRiskHomeDotPaths.contains { root in
+            let isBlocked = FileProtection.isProtectedUninstallPath(url) || highRiskHomeDotPaths.contains { root in
                 resolved == root || resolved.hasPrefix(root + "/")
             }
             if isBlocked {
@@ -316,48 +363,26 @@ final class AppState: ObservableObject {
         removalNeedsFullDiskAccess = false
         if !blocked.isEmpty {
             let blockedList = blocked.map(\.path).joined(separator: ", ")
-            Logger.shared.log("Refused to delete \(blocked.count) high-risk home dotpath(s): \(blockedList)", level: .warning)
+            Logger.shared.log("Refused to trash \(blocked.count) high-risk home dotpath(s): \(blockedList)", level: .warning)
             selectedFiles.subtract(blocked)
         }
         guard !urls.isEmpty else {
             if !blocked.isEmpty {
-                removalError = "Refused to delete \(blocked.count) protected item(s) (home credential directory or similar)."
+                removalError = "Refused to move \(blocked.count) protected item(s) to the Trash (home credential directory or similar)."
             }
             return
         }
-        trashDirectly(urls: urls) { [weak self] removed, needsFullDiskAccess, needsAdmin, failed in
+        isRemovingAppFiles = true
+        trashDirectly(urls: urls) { [weak self] removed, needsFullDiskAccess, failed in
             Task { @MainActor in
                 guard let self else { return }
+                self.isRemovingAppFiles = false
 
                 self.applyRemovedAppFiles(removed)
-
-                guard !needsAdmin.isEmpty else {
-                    self.finishRemoval(
-                        removedAny: !removed.isEmpty,
-                        needsFullDiskAccess: needsFullDiskAccess,
-                        attemptedAdmin: false,
-                        failed: failed,
-                        adminError: nil
-                    )
-                    return
-                }
-
-                let items = needsAdmin.map { self.cleanableUninstallItem(for: $0) }
-                let adminResult = await self.cleaningEngine.cleanWithAdminPrivileges(items: items)
-                let adminRemoved = needsAdmin.filter { adminResult.cleanedPaths.contains($0.path) }
-                let adminFailed = needsAdmin.filter { !adminResult.cleanedPaths.contains($0.path) }
-
-                self.applyRemovedAppFiles(adminRemoved)
-                for url in adminRemoved {
-                    Logger.shared.log("Removed \(url.path) with administrator privileges", level: .info)
-                }
-
                 self.finishRemoval(
-                    removedAny: !removed.isEmpty || !adminRemoved.isEmpty,
+                    removedAny: !removed.isEmpty,
                     needsFullDiskAccess: needsFullDiskAccess,
-                    attemptedAdmin: true,
-                    failed: failed + adminFailed,
-                    adminError: adminResult.errors.joined(separator: "; ")
+                    failed: failed
                 )
             }
         }
@@ -368,15 +393,20 @@ final class AppState: ObservableObject {
     /// Full Disk Access list. The previous AppleScript-via-Finder bridge
     /// caused the syscall to originate from Finder, which is why granting
     /// FDA to MClean made no difference (issue #75).
-    private func trashDirectly(urls: [URL], completion: @escaping ([URL], Bool, [URL], [URL]) -> Void) {
+    private func trashDirectly(urls: [URL], completion: @escaping ([URL], Bool, [URL]) -> Void) {
+        let operation = FileOperationTracker.shared.begin()
         DispatchQueue.global(qos: .userInitiated).async {
+            defer { FileOperationTracker.shared.end(operation) }
             let hasFullDiskAccess = FullDiskAccessManager.shared.hasFullDiskAccess
             var removed: [URL] = []
             var needsFullDiskAccess = false
-            var needsAdmin: [URL] = []
             var failed: [URL] = []
 
             for url in urls {
+                guard !FileProtection.isProtectedUninstallPath(url) else {
+                    failed.append(url)
+                    continue
+                }
                 var resulting: NSURL?
                 do {
                     try FileManager.default.trashItem(at: url, resultingItemURL: &resulting)
@@ -387,19 +417,19 @@ final class AppState: ObservableObject {
                         Logger.shared.log("Trash skipped for \(url.path): file no longer exists", level: .info)
                         removed.append(url)
                     } else if Self.isPermissionDeniedError(nsError) {
-                        if hasFullDiskAccess || Self.isLikelyAdministratorRemovalPath(url) {
-                            needsAdmin.append(url)
-                        } else {
+                        if !hasFullDiskAccess && !Self.isSystemOwnedRemovalPath(url) {
                             needsFullDiskAccess = true
-                            failed.append(url)
                         }
+                        // Never turn a failed Trash operation into a silent
+                        // privileged rm. Keep the item in place and explain why.
+                        failed.append(url)
                     } else {
                         Logger.shared.log("Trash failed for \(url.path): \(error.localizedDescription)", level: .error)
                         failed.append(url)
                     }
                 }
             }
-            completion(removed, needsFullDiskAccess, needsAdmin, failed)
+            completion(removed, needsFullDiskAccess, failed)
         }
     }
 
@@ -416,15 +446,13 @@ final class AppState: ObservableObject {
             }
         }
         selectedFiles.subtract(urls)
-        Logger.shared.log("Removed \(urls.count) file\(urls.count == 1 ? "" : "s")", level: .info)
+        Logger.shared.log("Moved \(urls.count) file\(urls.count == 1 ? "" : "s") to the Trash", level: .info)
     }
 
     private func finishRemoval(
         removedAny: Bool,
         needsFullDiskAccess: Bool,
-        attemptedAdmin: Bool,
-        failed: [URL],
-        adminError: String?
+        failed: [URL]
     ) {
         // Freeze the failed batch before the FDA sheet opens so the retry
         // path can't be poisoned by later selection edits or app switches.
@@ -432,9 +460,7 @@ final class AppState: ObservableObject {
         removalNeedsFullDiskAccess = needsFullDiskAccess
         if let message = removalFailureMessage(
             needsFullDiskAccess: needsFullDiskAccess,
-            attemptedAdmin: attemptedAdmin,
-            failed: failed,
-            adminError: adminError
+            failed: failed
         ) {
             removalError = message
             Logger.shared.log(message, level: .error)
@@ -444,34 +470,47 @@ final class AppState: ObservableObject {
         }
     }
 
-    /// Public bridge so views (e.g. AppFilesView) can build CleanableItem rows
-    /// from raw URLs when retrying via the PermissionCoordinator.
-    func makeUninstallCleanableItem(for url: URL) -> CleanableItem {
-        cleanableUninstallItem(for: url)
+    /// Request FDA and retry the frozen uninstall batch through the same
+    /// recoverable Trash path as the original operation. Routing these URLs
+    /// through CleaningEngine would incorrectly apply its cache-only allowlist
+    /// and reject legitimate app bundles or launch agents.
+    func requestFullDiskAccessAndRetryUninstall(appName: String) {
+        let capturedURLs = lastFailedRemovalURLs
+        guard !capturedURLs.isEmpty else { return }
+
+        removalError = nil
+        removalNeedsFullDiskAccess = false
+        lastFailedRemovalURLs = []
+        PermissionCoordinator.shared.requestAccess(
+            context: .uninstall(appName: appName, failedCount: capturedURLs.count),
+            failedPaths: capturedURLs.map(\.path)
+        ) { [weak self] in
+            Task { @MainActor [weak self] in
+                self?.retryUninstall(capturedURLs)
+            }
+        }
     }
 
-    private func cleanableUninstallItem(for url: URL) -> CleanableItem {
-        let values = try? url.resourceValues(forKeys: [
-            .totalFileAllocatedSizeKey,
-            .fileAllocatedSizeKey,
-            .contentModificationDateKey,
-        ])
-        let size = Int64(values?.totalFileAllocatedSize ?? values?.fileAllocatedSize ?? 0)
-        return CleanableItem(
-            name: url.lastPathComponent,
-            path: url.path,
-            size: size,
-            category: .systemJunk,
-            isSelected: true,
-            lastModified: values?.contentModificationDate
-        )
+    private func retryUninstall(_ urls: [URL]) {
+        guard !isRemovingAppFiles else { return }
+        isRemovingAppFiles = true
+        trashDirectly(urls: urls) { [weak self] removed, needsFullDiskAccess, failed in
+            Task { @MainActor [weak self] in
+                guard let self else { return }
+                self.isRemovingAppFiles = false
+                self.applyRemovedAppFiles(removed)
+                self.finishRemoval(
+                    removedAny: !removed.isEmpty,
+                    needsFullDiskAccess: needsFullDiskAccess,
+                    failed: failed
+                )
+            }
+        }
     }
 
     private func removalFailureMessage(
         needsFullDiskAccess: Bool,
-        attemptedAdmin: Bool,
-        failed: [URL],
-        adminError: String?
+        failed: [URL]
     ) -> String? {
         if needsFullDiskAccess {
             let prefix = failed.isEmpty ? "Some selected files" : "\(failed.count) file\(failed.count == 1 ? "" : "s")"
@@ -479,14 +518,7 @@ final class AppState: ObservableObject {
         }
 
         if !failed.isEmpty {
-            if attemptedAdmin {
-                return "\(failed.count) file\(failed.count == 1 ? "" : "s") could not be removed with administrator privileges. The items may have changed or macOS denied access."
-            }
-            return "\(failed.count) file\(failed.count == 1 ? "" : "s") could not be removed. Check that the items still exist and are not in use."
-        }
-
-        if let adminError, !adminError.isEmpty {
-            return "Administrator removal failed: \(adminError)"
+            return "\(failed.count) file\(failed.count == 1 ? "" : "s") could not be moved to the Trash. Check permissions or remove the item in Finder."
         }
         return nil
     }
@@ -504,7 +536,7 @@ final class AppState: ObservableObject {
                 (nsError.code == Int(EACCES) || nsError.code == Int(EPERM)))
     }
 
-    private nonisolated static func isLikelyAdministratorRemovalPath(_ url: URL) -> Bool {
+    private nonisolated static func isSystemOwnedRemovalPath(_ url: URL) -> Bool {
         let path = (url.resolvingSymlinksInPath().path as NSString).standardizingPath
         let home = FileManager.default.homeDirectoryForCurrentUser.path
 
@@ -554,16 +586,19 @@ final class AppState: ObservableObject {
             // the App Uninstaller. Loading it is MANDATORY for correctness:
             // with an empty known-apps set, every leftover would match nothing
             // and be flagged as orphaned — a dangerous false positive. Fetch
-            // it synchronously (cheap after the size cache warms) and seed the
-            // shared list so the UI benefits too.
-            var knownApps = await MainActor.run { self.installedApps }
+            // lightweight identities without loading icons or recursively
+            // sizing every app bundle.
+            let knownApps = await MainActor.run { self.installedApps }
+            let identities: [InstalledAppIdentity]
             if knownApps.isEmpty {
-                knownApps = AppInfoFetcher.shared.fetchInstalledApps()
-                let loaded = knownApps
-                await MainActor.run { self.installedApps = loaded }
+                identities = AppInfoFetcher.shared.fetchInstalledAppIdentities()
+            } else {
+                identities = knownApps.map {
+                    InstalledAppIdentity(appName: $0.appName, bundleIdentifier: $0.bundleIdentifier)
+                }
             }
-            let knownIDs = Set(knownApps.map { $0.bundleIdentifier.normalizedForMatching() })
-            let knownNames = Set(knownApps.map { $0.appName.normalizedForMatching() })
+            let knownIDs = Set(identities.map { $0.bundleIdentifier.normalizedForMatching() })
+            let knownNames = Set(identities.map { $0.appName.normalizedForMatching() })
             // Paths the user marked "Always Ignore" (issue #114). These were
             // false positives for them, so they stay hidden from every scan
             // until the user forgets the list in Settings.
@@ -573,6 +608,9 @@ final class AppState: ObservableObject {
             let fm = FileManager.default
 
             for path in locations.reverseSearch.paths {
+                guard OrphanSafetyPolicy.shouldScanDirectory(URL(fileURLWithPath: path)) else {
+                    continue
+                }
                 guard let contents = try? fm.contentsOfDirectory(atPath: path) else { continue }
                 for item in contents {
                     let normalized = item.normalizedForMatching()
@@ -604,7 +642,7 @@ final class AppState: ObservableObject {
 
     // MARK: - Orphan ignore list (#114)
 
-    static let ignoredOrphansKey = "settings.orphans.ignored"
+    nonisolated static let ignoredOrphansKey = "settings.orphans.ignored"
 
     /// Number of paths currently on the "always ignore" list. Read from
     /// UserDefaults each access so the Settings row tracks live changes.
@@ -639,6 +677,40 @@ final class AppState: ObservableObject {
 
     // MARK: - Selection
 
+    var excludedCleanupPaths: [String] {
+        CleanupExclusions.paths()
+    }
+
+    func excludeFromCleanup(_ item: CleanableItem) {
+        guard !item.isActionItem, !scanState.isActive else { return }
+        CleanupExclusions.add(item.path)
+        for (category, result) in categoryResults {
+            categoryResults[category] = applyingCleanupExclusions(to: result)
+        }
+        totalJunkSize = categoryResults.values.reduce(0) { $0 + $1.totalSize }
+    }
+
+    func removeCleanupExclusion(_ path: String) {
+        UserDefaults.standard.set(excludedCleanupPaths.filter { $0 != path }, forKey: CleanupExclusions.defaultsKey)
+        objectWillChange.send()
+    }
+
+    private func applyingCleanupExclusions(to result: CategoryResult) -> CategoryResult {
+        let excluded = excludedCleanupPaths
+        guard !excluded.isEmpty else { return result }
+        let items = result.items.filter { !CleanupExclusions.excludes($0.path, paths: excluded) }
+        return CategoryResult(category: result.category, items: items, totalSize: items.reduce(0) { $0 + $1.size })
+    }
+
+    func setSelection(_ selected: Bool, for items: [CleanableItem]) {
+        guard !scanState.isActive else { return }
+        for item in items where isItemSelected(item) != selected {
+            toggleItem(item)
+        }
+    }
+
+    // MARK: - Selection
+
     func isItemSelected(_ item: CleanableItem) -> Bool {
         if item.isSelected {
             return !deselectedItems.contains(item.id)
@@ -647,6 +719,7 @@ final class AppState: ObservableObject {
     }
 
     func toggleItem(_ item: CleanableItem) {
+        guard !scanState.isActive else { return }
         if isItemSelected(item) {
             if item.isSelected {
                 deselectedItems.insert(item.id)
@@ -758,8 +831,7 @@ final class AppState: ObservableObject {
     }
 
     /// Request Full Disk Access via the rich PermissionCoordinator sheet and
-    /// retry the supplied items once the user grants permission. Used by both
-    /// the cleanup and app-uninstall flows so they share a single UI surface.
+    /// retry the supplied cleanup items once the user grants permission.
     ///
     /// The retry callback captures `items` directly rather than reading
     /// `pendingPermissionRetryItems` at fire time — that field is mutable
@@ -783,25 +855,26 @@ final class AppState: ObservableObject {
         }
     }
 
-    private func retryCleanItems(_ items: [CleanableItem]) async {
+    func retryCleanItems(_ items: [CleanableItem]) async {
+        guard !scanState.isActive else {
+            pendingPermissionRetryItems = items
+            cleanError = String(localized: "Please wait for the current task to finish.")
+            return
+        }
+        let generation = UUID()
+        cleanupGeneration = generation
         scanState = .cleaning(progress: 0)
         activity.cleanProgress = 0
 
-        var result = await cleaningEngine.cleanItems(items) { [weak self] progress in
+        let result = await cleaningEngine.cleanItems(items) { [weak self] progress in
             Task { @MainActor [weak self] in
-                self?.activity.cleanProgress = progress
+                guard let self, self.cleanupGeneration == generation, case .cleaning = self.scanState else { return }
+                    self.activity.cleanProgress = progress
             }
         }
-        if !result.requiresAdmin.isEmpty {
-            let admin = await cleaningEngine.cleanWithAdminPrivileges(items: result.requiresAdmin)
-            result.cleanedPaths.formUnion(admin.cleanedPaths)
-            result.itemsCleaned += admin.itemsCleaned
-            result.freedSpace += admin.freedSpace
-            result.errors.append(contentsOf: admin.errors)
-        }
 
-        totalFreedSpace = result.freedSpace
-        lastCleanedDate = Date()
+        totalProcessedSpace = result.processedSpace
+        if result.itemsCleaned > 0 { lastCleanedDate = Date() }
 
         for (cat, catResult) in categoryResults {
             let remaining = catResult.items.filter { !result.cleanedPaths.contains($0.path) }
@@ -826,13 +899,18 @@ final class AppState: ObservableObject {
         // cleanup uses. Without this, an FDA revocation between grant and
         // retry would silently drop errors instead of re-popping the sheet.
         let survivors = items.filter { !result.cleanedPaths.contains($0.path) }
-        handleCleanOutcome(errors: result.errors, survivors: survivors)
+        handleCleanOutcome(
+            errors: result.errors,
+            survivors: survivors,
+            permissionDeniedPaths: result.permissionDeniedPaths
+        )
 
         scanState = .cleaned
         loadDiskInfo()
         try? await Task.sleep(nanoseconds: 3_000_000_000)
+        guard cleanupGeneration == generation, case .cleaned = scanState else { return }
         scanState = .idle
-        totalFreedSpace = 0
+        totalProcessedSpace = 0
     }
 
     // MARK: - Disk Info
@@ -848,6 +926,9 @@ final class AppState: ObservableObject {
 
     func startSmartScan() {
         guard !scanState.isActive else { return }
+        let generation = UUID()
+        scanGeneration = generation
+        scanWasCancelled = false
 
         // scanState now changes only on real transitions (idle → scanning →
         // completed); per-tick progress lives on `activity` so the whole
@@ -869,14 +950,16 @@ final class AppState: ObservableObject {
         activity.currentCategory = categories.first?.rawValue ?? ""
         clearSelectionState()
 
-        Task {
+        scanTask = Task { [weak self] in
+            guard let self else { return }
             let total = categories.count
             var completed = 0
             var nextIndex = 0
 
             let onPath: @Sendable (String) -> Void = { [weak self] path in
                 Task { @MainActor [weak self] in
-                    self?.scanTicker.path = path
+                    guard let self, self.scanGeneration == generation else { return }
+                    self.scanTicker.path = path
                 }
             }
 
@@ -891,9 +974,9 @@ final class AppState: ObservableObject {
 
                 // Nested funcs don't inherit the surrounding MainActor
                 // isolation, so submitNext must not touch UI state — all
-                // `activity` updates happen in the isolated while-loop below.
+                // `self.activity` updates happen in the isolated while-loop below.
                 func submitNext() {
-                    guard nextIndex < categories.count else { return }
+                    guard !Task.isCancelled, nextIndex < categories.count else { return }
                     let category = categories[nextIndex]
                     nextIndex += 1
                     inFlight += 1
@@ -915,20 +998,22 @@ final class AppState: ObservableObject {
                 for _ in 0..<cap { submitNext() }
                 while inFlight > 0 {
                     guard let (category, result) = await group.next() else { break }
+                    guard !Task.isCancelled, self.scanGeneration == generation else { group.cancelAll(); break }
                     inFlight -= 1
                     completed += 1
-                    categoryResults[category] = result
-                    totalJunkSize += result.totalSize
+                    let filtered = self.applyingCleanupExclusions(to: result)
+                    self.categoryResults[category] = filtered
+                    self.totalJunkSize += filtered.totalSize
                     // Honest progress: completed/total only. An earlier build
                     // blended half-credit for in-flight work, which shot the
                     // ring to ~50% while the quick categories finished and
                     // then froze it there for the whole heavy tail — reading
                     // as a stall even when work was progressing.
-                    activity.scanProgress = Double(completed) / Double(total)
+                    self.activity.scanProgress = Double(completed) / Double(total)
                     // Label the next category about to run (or keep the last
                     // one while the final heavy job finishes).
                     if nextIndex < categories.count {
-                        activity.currentCategory = categories[nextIndex].rawValue
+                        self.activity.currentCategory = categories[nextIndex].rawValue
                     }
                     submitNext()
                 }
@@ -936,6 +1021,10 @@ final class AppState: ObservableObject {
                 Logger.shared.log("SmartScan total: \(totalElapsed)s")
             }
 
+            guard !Task.isCancelled, scanGeneration == generation else { return }
+            normalizeCleanupResults()
+            lastScanDate = Date()
+            scanTask = nil
             activity.scanProgress = 1.0
             scanTicker.path = ""
             scanState = .completed
@@ -965,21 +1054,30 @@ final class AppState: ObservableObject {
     }
 
     func scanSingleCategory(_ category: CleaningCategory) {
-        guard !scanState.isActive else { return }
+        guard !scanState.isActive, CleaningCategory.scannable.contains(category) else { return }
+        let generation = UUID()
+        scanGeneration = generation
+        scanWasCancelled = false
 
         scanState = .scanning(progress: 0, currentCategory: category.rawValue)
         activity.scanProgress = 0
         activity.currentCategory = category.rawValue
 
-        Task {
+        scanTask = Task { [weak self] in
+            guard let self else { return }
             activity.scanProgress = 0.5
             clearSelectionState(for: category)
             let result = await scanEngine.scanCategory(category) { [weak self] path in
                 Task { @MainActor [weak self] in
-                    self?.scanTicker.path = path
+                    guard let self, self.scanGeneration == generation else { return }
+                    self.scanTicker.path = path
                 }
             }
-            categoryResults[category] = result
+            guard !Task.isCancelled, scanGeneration == generation else { return }
+            categoryResults[category] = applyingCleanupExclusions(to: result)
+            normalizeCleanupResults()
+            lastScanDate = Date()
+            scanTask = nil
 
             totalJunkSize = categoryResults.values.reduce(0) { $0 + $1.totalSize }
             activity.scanProgress = 1.0
@@ -988,36 +1086,63 @@ final class AppState: ObservableObject {
         }
     }
 
+    func cancelScan() {
+        guard case .scanning = scanState else { return }
+        scanGeneration = UUID()
+        scanTask?.cancel()
+        scanTask = nil
+        scanTicker.path = ""
+        scanWasCancelled = true
+        normalizeCleanupResults()
+        scanState = .completed
+    }
+
+    private func normalizeCleanupResults() {
+        let order = CleaningCategory.scannable.filter { $0 != .userCache && $0 != .systemJunk }
+            + [.userCache, .systemJunk]
+        var claimed: [String] = []
+        for category in order {
+            guard let result = categoryResults[category] else { continue }
+            let items = result.items.filter { item in
+                let path = URL(fileURLWithPath: item.path).standardizedFileURL.path
+                guard !claimed.contains(where: {
+                    $0 == path || path.hasPrefix($0 + "/") || $0.hasPrefix(path + "/")
+                }) else { return false }
+                claimed.append(path)
+                return true
+            }
+            categoryResults[category] = CategoryResult(category: category, items: items,
+                totalSize: items.reduce(0) { $0 + $1.size })
+        }
+        totalJunkSize = categoryResults.values.reduce(0) { $0 + $1.totalSize }
+    }
+
     // MARK: - Cleaning
 
-    func cleanAll() {
+    func cleanAll(includeTrashBins: Bool = true, itemIDs: Set<UUID>? = nil, scheduled: Bool = false) {
         guard !scanState.isActive else { return }
 
-        let itemsToClean = allResults.flatMap { $0.items }.filter { isItemSelected($0) }
+        let itemsToClean = allResults
+            .flatMap { $0.items }
+            .filter { isItemSelected($0) && (itemIDs?.contains($0.id) ?? true) && (includeTrashBins || ($0.category != .trashBins && !$0.isActionItem)) }
+            .filter { !scheduled || !XcodeBuildMCPDerivedDataSupport.isManagedDerivedDataPath($0.path) || XcodeBuildMCPDerivedDataSupport.isEligibleForScheduledAutoClean($0) }
         guard !itemsToClean.isEmpty else { return }
 
+        let generation = UUID()
+        cleanupGeneration = generation
         scanState = .cleaning(progress: 0)
         activity.cleanProgress = 0
 
         Task {
-            var result = await cleaningEngine.cleanItems(itemsToClean) { [weak self] progress in
+            let result = await cleaningEngine.cleanItems(itemsToClean) { [weak self] progress in
                 Task { @MainActor [weak self] in
-                    self?.activity.cleanProgress = progress
+                    guard let self, self.cleanupGeneration == generation, case .cleaning = self.scanState else { return }
+                    self.activity.cleanProgress = progress
                 }
             }
 
-            // Escalate root-owned items via "with administrator privileges".
-            // One auth prompt covers the entire batch.
-            if !result.requiresAdmin.isEmpty {
-                let admin = await cleaningEngine.cleanWithAdminPrivileges(items: result.requiresAdmin)
-                result.cleanedPaths.formUnion(admin.cleanedPaths)
-                result.itemsCleaned += admin.itemsCleaned
-                result.freedSpace += admin.freedSpace
-                result.errors.append(contentsOf: admin.errors)
-            }
-
-            totalFreedSpace = result.freedSpace
-            lastCleanedDate = Date()
+            totalProcessedSpace = result.processedSpace
+            if result.itemsCleaned > 0 { lastCleanedDate = Date() }
             if result.itemsCleaned > 0 { Haptics.successWithSound() }
 
             let survivors = itemsToClean.filter { !result.cleanedPaths.contains($0.path) }
@@ -1041,43 +1166,43 @@ final class AppState: ObservableObject {
             }
             totalJunkSize = categoryResults.values.reduce(0) { $0 + $1.totalSize }
 
-            handleCleanOutcome(errors: result.errors, survivors: survivors)
+            handleCleanOutcome(
+                errors: result.errors,
+                survivors: survivors,
+                permissionDeniedPaths: result.permissionDeniedPaths
+            )
 
             scanState = .cleaned
             loadDiskInfo()
 
             try? await Task.sleep(nanoseconds: 3_000_000_000)
+            guard cleanupGeneration == generation, case .cleaned = scanState else { return }
             scanState = .idle
-            totalFreedSpace = 0
+            totalProcessedSpace = 0
         }
     }
 
-    func cleanCategory(_ category: CleaningCategory) {
+    func cleanCategory(_ category: CleaningCategory, itemIDs: Set<UUID>? = nil) {
         guard let result = categoryResults[category], !scanState.isActive else { return }
 
-        let selectedItems = result.items.filter { isItemSelected($0) }
+        let selectedItems = result.items.filter { isItemSelected($0) && (itemIDs?.contains($0.id) ?? true) }
         guard !selectedItems.isEmpty else { return }
 
+        let generation = UUID()
+        cleanupGeneration = generation
         scanState = .cleaning(progress: 0)
         activity.cleanProgress = 0
 
         Task {
-            var cleanResult = await cleaningEngine.cleanItems(selectedItems) { [weak self] progress in
+            let cleanResult = await cleaningEngine.cleanItems(selectedItems) { [weak self] progress in
                 Task { @MainActor [weak self] in
-                    self?.activity.cleanProgress = progress
+                    guard let self, self.cleanupGeneration == generation, case .cleaning = self.scanState else { return }
+                    self.activity.cleanProgress = progress
                 }
             }
 
-            if !cleanResult.requiresAdmin.isEmpty {
-                let admin = await cleaningEngine.cleanWithAdminPrivileges(items: cleanResult.requiresAdmin)
-                cleanResult.cleanedPaths.formUnion(admin.cleanedPaths)
-                cleanResult.itemsCleaned += admin.itemsCleaned
-                cleanResult.freedSpace += admin.freedSpace
-                cleanResult.errors.append(contentsOf: admin.errors)
-            }
-
-            totalFreedSpace = cleanResult.freedSpace
-            lastCleanedDate = Date()
+            totalProcessedSpace = cleanResult.processedSpace
+            if cleanResult.itemsCleaned > 0 { lastCleanedDate = Date() }
 
             if let existing = categoryResults[category] {
                 let remaining = existing.items.filter { !cleanResult.cleanedPaths.contains($0.path) }
@@ -1099,22 +1224,32 @@ final class AppState: ObservableObject {
             totalJunkSize = categoryResults.values.reduce(0) { $0 + $1.totalSize }
 
             let survivors = selectedItems.filter { !cleanResult.cleanedPaths.contains($0.path) }
-            handleCleanOutcome(errors: cleanResult.errors, survivors: survivors)
+            handleCleanOutcome(
+                errors: cleanResult.errors,
+                survivors: survivors,
+                permissionDeniedPaths: cleanResult.permissionDeniedPaths
+            )
 
             scanState = .cleaned
             loadDiskInfo()
 
             try? await Task.sleep(nanoseconds: 3_000_000_000)
+            guard cleanupGeneration == generation, case .cleaned = scanState else { return }
             scanState = .idle
-            totalFreedSpace = 0
+            totalProcessedSpace = 0
         }
     }
 
     /// Inspect a clean batch's leftovers and either route the user into the
     /// PermissionSheet (FDA is the most likely cause) or surface a richer
     /// error alert that lists actual paths instead of "Check the log".
-    private func handleCleanOutcome(errors: [String], survivors: [CleanableItem]) {
-        guard !errors.isEmpty || !survivors.isEmpty else {
+    private func handleCleanOutcome(
+        errors: [String],
+        survivors: [CleanableItem],
+        permissionDeniedPaths: Set<String>
+    ) {
+        lastCleanupHadFailures = !errors.isEmpty || !survivors.isEmpty
+        guard lastCleanupHadFailures else {
             cleanError = nil
             cleanErrorIsFDAFixable = false
             pendingPermissionRetryItems = []
@@ -1122,14 +1257,15 @@ final class AppState: ObservableObject {
         }
 
         let fdaGranted = FullDiskAccessManager.shared.hasFullDiskAccess
-        let likelyFDA = !fdaGranted && !survivors.isEmpty
+        let permissionSurvivors = survivors.filter { permissionDeniedPaths.contains($0.path) }
+        let likelyFDA = !fdaGranted && !permissionSurvivors.isEmpty
         cleanErrorIsFDAFixable = likelyFDA
-        pendingPermissionRetryItems = survivors
+        pendingPermissionRetryItems = likelyFDA ? permissionSurvivors : survivors
 
         if likelyFDA {
             cleanError = String(
                 format: String(localized: "%lld item(s) need Full Disk Access to remove. Tap Grant Access to fix in one step."),
-                Int64(survivors.count)
+                Int64(permissionSurvivors.count)
             )
         } else if !survivors.isEmpty {
             let preview = survivors.prefix(2).map { ($0.path as NSString).lastPathComponent }.joined(separator: ", ")
@@ -1143,44 +1279,57 @@ final class AppState: ObservableObject {
         }
     }
 
-    // MARK: - Purgeable
-
-    func purgePurgeable() {
-        guard !scanState.isActive else { return }
-
-        scanState = .cleaning(progress: 0)
-
-        Task {
-            scanState = .cleaning(progress: 0.5)
-            let freed = await cleaningEngine.purgePurgeableSpace()
-            totalFreedSpace = freed
-            scanState = .cleaned
-            loadDiskInfo()
-
-            try? await Task.sleep(nanoseconds: 3_000_000_000)
-            scanState = .idle
-            totalFreedSpace = 0
-        }
-    }
-
     // MARK: - Scheduled Scan
 
+    var canInstallAppUpdate: Bool {
+        !FileOperationTracker.shared.isBusy && !showCleanConfirmation && !scanState.isActive && !isScanningAppFiles && !isRemovingAppFiles
+            && !isSearchingOrphans && !PermissionCoordinator.shared.isRequesting
+            && spaceLens.state != .scanning && spaceLens.state != .trashing
+    }
+
+    func canRunScheduledScan(isAppActive: Bool) -> Bool {
+        !FileOperationTracker.shared.isBusy && !isAppActive && !showCleanConfirmation && !scanState.isActive && !isScanningAppFiles && !isRemovingAppFiles
+            && !isSearchingOrphans && !PermissionCoordinator.shared.isRequesting
+            && spaceLens.state != .scanning && spaceLens.state != .trashing
+    }
+
     private func runScheduledScan() async {
-        let categories = scheduler.config.categoriesToScan
+        guard canRunScheduledScan(isAppActive: NSApp.isActive) else {
+            Logger.shared.log("Scheduled scan skipped because another scan or clean is active", level: .info)
+            return
+        }
+        let categories = scheduler.config.categoriesToScan.filter { CleaningCategory.scannable.contains($0) }
+        guard !categories.isEmpty else { return }
+        let generation = UUID()
+        scanGeneration = generation
+        scanWasCancelled = false
         var totalFound: Int64 = 0
+        scanState = .scanning(progress: 0, currentCategory: categories.first?.rawValue ?? "")
+        activity.scanProgress = 0
+        activity.currentCategory = categories.first?.rawValue ?? ""
         clearSelectionState()
         categoryResults = [:]
 
-        for category in categories {
-            let result = await scanEngine.scanCategory(category)
+        for (index, category) in categories.enumerated() {
+            activity.currentCategory = category.rawValue
+            let result = applyingCleanupExclusions(to: await scanEngine.scanCategory(category))
+            guard !Task.isCancelled, scanGeneration == generation else { return }
             categoryResults[category] = result
             totalFound += result.totalSize
+            activity.scanProgress = Double(index + 1) / Double(max(categories.count, 1))
         }
 
-        totalJunkSize = totalFound
+        normalizeCleanupResults()
+        totalFound = totalJunkSize
+        lastScanDate = Date()
+        scanState = .completed
 
-        if scheduler.config.autoClean && totalFound >= scheduler.config.minimumCleanSize {
-            cleanAll()
+        let autoCleanSize = allResults.flatMap(\.items).filter { isItemSelected($0) && $0.category != .trashBins && !$0.isActionItem }.reduce(Int64(0)) { $0 + $1.size }
+        if scheduler.config.autoClean && autoCleanSize >= scheduler.config.minimumCleanSize {
+            // Empty Trash is permanent, so scheduled automation never includes
+            // it even when the category was scanned. The user can still empty
+            // Trash manually after reviewing the result.
+            cleanAll(includeTrashBins: false, scheduled: true)
         }
 
         // Purgeable space is intentionally NOT auto-purged: macOS reserves and
@@ -1212,7 +1361,7 @@ final class AppState: ObservableObject {
         app: InstalledApp,
         locations: Locations,
         completion: @escaping (Set<URL>) -> Void
-    ) {
+    ) -> (() -> Void)? {
         let appInfo = AppPathFinder.AppInfo(
             appName: app.appName,
             bundleIdentifier: app.bundleIdentifier,
@@ -1220,7 +1369,15 @@ final class AppState: ObservableObject {
             entitlements: nil,
             teamIdentifier: nil
         )
-        let finder = AppPathFinder(appInfo: appInfo, locations: locations)
+        let stored = UserDefaults.standard.string(forKey: "settings.general.searchSensitivity")
+        let sensitivity: AppPathFinder.Sensitivity
+        switch SearchSensitivity(rawValue: stored ?? SearchSensitivity.enhanced.rawValue) ?? .enhanced {
+        case .strict: sensitivity = .strict
+        case .enhanced: sensitivity = .enhanced
+        case .deep: sensitivity = .deep
+        }
+        let finder = AppPathFinder(appInfo: appInfo, locations: locations, sensitivity: sensitivity)
         finder.findPathsAsync(completion: completion)
+        return { finder.cancel() }
     }
 }

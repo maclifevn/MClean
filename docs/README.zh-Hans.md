@@ -157,3 +157,5 @@ MClean/
 ## 许可证
 
 MIT 许可证。详情请参阅 [LICENSE](../LICENSE)。
+
+Functional updates from PureMac 3.1.0 are integrated while preserving the existing MClean interface. See [the synchronization report](UPSTREAM-SYNC.md). Ordinary files use Trash; Trash emptying, runtime removal, Docker prune and local snapshot removal are permanent actions. Release checks and Homebrew updates use the network; scans stay local.

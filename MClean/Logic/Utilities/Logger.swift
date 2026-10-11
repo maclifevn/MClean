@@ -25,41 +25,52 @@ enum LogLevel: String, Sendable, CaseIterable {
     }
 }
 
-@MainActor
-final class Logger: ObservableObject {
+/// Thread-safe process logger. No current view observes log entries, so keeping
+/// this service off the main actor avoids one task hop for every warning emitted
+/// by scanner actors and remains compatible with Swift 6 strict concurrency.
+final class Logger: @unchecked Sendable {
 
     static let shared = Logger()
 
-    @Published private(set) var entries: [LogEntry] = []
-
     private static let maxEntries = 1000
-
     private let osLogger: os.Logger
+    private let lock = NSLock()
+    private var entryStorage: [LogEntry] = []
+    private var nextReplacementIndex = 0
+
+    var entries: [LogEntry] {
+        lock.lock()
+        defer { lock.unlock() }
+        guard entryStorage.count == Self.maxEntries,
+              nextReplacementIndex > 0 else {
+            return entryStorage
+        }
+        return Array(entryStorage[nextReplacementIndex...])
+            + Array(entryStorage[..<nextReplacementIndex])
+    }
 
     private init() {
         let subsystem = Bundle.main.bundleIdentifier ?? "com.maclife.mclean"
         self.osLogger = os.Logger(subsystem: subsystem, category: "general")
     }
 
-    nonisolated func log(_ message: String, level: LogLevel = .info, source: String = #function) {
+    func log(_ message: String, level: LogLevel = .info, source: String = #function) {
         osLogger.log(level: level.osLogType, "\(message, privacy: .public)")
 
-        // .debug entries go to os.Logger (Console.app) only. High-frequency
-        // per-item logs on hot paths (e.g. one line per trashed file) use
-        // .debug so they don't grow the in-memory @Published array or spawn a
-        // main-actor hop each call.
+        // High-frequency per-item logs stay in Console.app without filling the
+        // in-memory diagnostics ring.
         guard level != .debug else { return }
-
-        let entry = LogEntry(message: message, level: level, source: source)
-        Task { @MainActor [weak self] in
-            self?.append(entry)
-        }
+        append(LogEntry(message: message, level: level, source: source))
     }
 
     private func append(_ entry: LogEntry) {
-        entries.append(entry)
-        if entries.count > Self.maxEntries {
-            entries.removeFirst(entries.count - Self.maxEntries)
+        lock.lock()
+        defer { lock.unlock() }
+        if entryStorage.count < Self.maxEntries {
+            entryStorage.append(entry)
+        } else {
+            entryStorage[nextReplacementIndex] = entry
+            nextReplacementIndex = (nextReplacementIndex + 1) % Self.maxEntries
         }
     }
 }

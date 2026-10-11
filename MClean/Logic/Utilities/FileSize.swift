@@ -10,6 +10,11 @@ import Foundation
 /// the regular files instead.
 enum FileSizeCalculator {
     private static let fileManager = FileManager.default
+    private static let directoryKeys: [URLResourceKey] = [
+        .totalFileAllocatedSizeKey, .fileAllocatedSizeKey,
+        .isRegularFileKey, .isSymbolicLinkKey,
+    ]
+    private static let directoryKeySet = Set(directoryKeys)
 
     /// On-disk allocated size of `url`. Recurses into directories.
     /// Returns `nil` if the item can't be read at all.
@@ -44,13 +49,19 @@ enum FileSizeCalculator {
     private static func directorySize(of url: URL) -> Int64 {
         guard let enumerator = fileManager.enumerator(
             at: url,
-            includingPropertiesForKeys: [.totalFileAllocatedSizeKey, .fileAllocatedSizeKey, .isRegularFileKey, .isSymbolicLinkKey],
-            options: [.skipsHiddenFiles]
+            includingPropertiesForKeys: directoryKeys,
+            options: []
         ) else { return 0 }
 
         var total: Int64 = 0
+        var count = 0
         for case let fileURL as URL in enumerator {
-            guard let values = try? fileURL.resourceValues(forKeys: [.totalFileAllocatedSizeKey, .fileAllocatedSizeKey, .isRegularFileKey, .isSymbolicLinkKey]) else { continue }
+            count += 1
+            if count.isMultiple(of: 256),
+               withUnsafeCurrentTask(body: { $0?.isCancelled ?? false }) {
+                break
+            }
+            guard let values = try? fileURL.resourceValues(forKeys: directoryKeySet) else { continue }
             // Skip symlinks so we don't double-count or follow links that
             // escape the directory. Only sum regular-file payload.
             if values.isSymbolicLink == true { continue }

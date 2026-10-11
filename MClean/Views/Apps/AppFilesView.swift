@@ -63,21 +63,16 @@ struct AppFilesView: View {
     /// One-pass size cache so group headers and the selected-size counter
     /// don't re-stat the disk on every render.
     @State private var sizeCache: [URL: Int64] = [:]
+    @State private var groupedFiles: [(group: LeftoverGroup, urls: [URL])] = []
+    @State private var groupSizeCache: [LeftoverGroup: Int64] = [:]
+    @State private var showBulkRemovalConfirmation = false
+    @State private var pendingRemovalURLs: Set<URL> = []
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @AppStorage("settings.general.confirmBeforeDelete") private var confirmBeforeDelete = true
 
     private var totalSelectedSize: Int64 {
         appState.selectedFiles.reduce(Int64(0)) { total, url in
             total + (cachedSize(url) ?? 0)
-        }
-    }
-
-    /// Discovered files bucketed for display, preserving the sorted order
-    /// inside each bucket. Only non-empty groups are shown.
-    private var groupedFiles: [(group: LeftoverGroup, urls: [URL])] {
-        let buckets = Dictionary(grouping: appState.discoveredFiles, by: LeftoverGroup.categorize)
-        return LeftoverGroup.allCases.compactMap { group in
-            guard let urls = buckets[group], !urls.isEmpty else { return nil }
-            return (group, urls)
         }
     }
 
@@ -105,8 +100,35 @@ struct AppFilesView: View {
                 actionBar
             }
         }
-        .onAppear { rebuildSizeCache() }
-        .onChange(of: appState.discoveredFiles) { _ in rebuildSizeCache() }
+        .task(id: appState.discoveredFiles) {
+            let urls = appState.discoveredFiles
+            let buckets = Dictionary(grouping: urls, by: LeftoverGroup.categorize)
+            groupedFiles = LeftoverGroup.allCases.compactMap { group in
+                guard let grouped = buckets[group], !grouped.isEmpty else { return nil }
+                return (group, grouped)
+            }
+            sizeCache = [:]
+            groupSizeCache = [:]
+
+            let worker = Task.detached(priority: .utility) { () -> [URL: Int64] in
+                var cache: [URL: Int64] = [:]
+                for url in urls {
+                    guard !Task.isCancelled else { break }
+                    cache[url] = FileSizeCalculator.size(of: url) ?? 0
+                }
+                return cache
+            }
+            let sizes = await withTaskCancellationHandler {
+                await worker.value
+            } onCancel: {
+                worker.cancel()
+            }
+            guard !Task.isCancelled, appState.discoveredFiles == urls else { return }
+            sizeCache = sizes
+            groupSizeCache = Dictionary(uniqueKeysWithValues: groupedFiles.map { entry in
+                (entry.group, entry.urls.reduce(0) { $0 + (sizes[$1] ?? 0) })
+            })
+        }
         .onChange(of: appState.removalNeedsFullDiskAccess) { needs in
             // FDA-fixable removals jump straight into the rich sheet, the
             // same flow cleanup uses. The user grants permission once and we
@@ -114,15 +136,22 @@ struct AppFilesView: View {
             // AppState so a mid-sheet selection change or app switch doesn't
             // re-trash the wrong files.
             guard needs else { return }
-            let toRetry = appState.lastFailedRemovalURLs
-            let items = toRetry.map { appState.makeUninstallCleanableItem(for: $0) }
-            appState.removalError = nil
-            appState.removalNeedsFullDiskAccess = false
-            appState.lastFailedRemovalURLs = []
-            appState.requestFullDiskAccessAndRetry(
-                items: items,
-                context: .uninstall(appName: app.appName, failedCount: items.count)
-            )
+            appState.requestFullDiskAccessAndRetryUninstall(appName: app.appName)
+        }
+        .onChange(of: showBulkRemovalConfirmation) { appState.showCleanConfirmation = $0 }
+        .onDisappear { appState.showCleanConfirmation = false }
+        .confirmationDialog(
+            String(format: String(localized: "Move %lld files to the Trash?"), Int64(pendingRemovalURLs.count)),
+            isPresented: $showBulkRemovalConfirmation,
+            titleVisibility: .visible
+        ) {
+            Button("Move to Trash", role: .destructive) {
+                appState.removeSelectedFiles(confirmedURLs: pendingRemovalURLs)
+                pendingRemovalURLs = []
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("Items can be restored from the Trash.")
         }
         .alert("Removal Failed", isPresented: Binding(
             get: { appState.removalError != nil && !appState.removalNeedsFullDiskAccess },
@@ -236,7 +265,7 @@ struct AppFilesView: View {
     }
 
     private func groupHeader(_ group: LeftoverGroup, urls: [URL]) -> some View {
-        let groupSize = urls.reduce(Int64(0)) { $0 + (cachedSize($1) ?? 0) }
+        let groupSize = groupSizeCache[group] ?? 0
         let allSelected = urls.allSatisfy { appState.selectedFiles.contains($0) }
 
         return HStack(spacing: 10) {
@@ -309,11 +338,17 @@ struct AppFilesView: View {
 
             if !appState.selectedFiles.isEmpty {
                 Button(role: .destructive) {
-                    appState.removeSelectedFiles()
+                    if confirmBeforeDelete {
+                        pendingRemovalURLs = appState.selectedFiles
+                        showBulkRemovalConfirmation = true
+                    } else {
+                        appState.removeSelectedFiles()
+                    }
                 } label: {
                     Text(removeFilesLabel)
                 }
                 .buttonStyle(GlowProminentButtonStyle(tint: Tint.red, gradient: TintGradient.destructive))
+                .disabled(appState.isRemovingAppFiles)
                 .transition(
                     reduceMotion
                         ? .opacity
@@ -359,25 +394,14 @@ struct AppFilesView: View {
     }
 
     private func cachedSize(_ url: URL) -> Int64? {
-        if let cached = sizeCache[url] { return cached }
-        return fileSize(url)
-    }
-
-    private func rebuildSizeCache() {
-        var cache: [URL: Int64] = [:]
-        for url in appState.discoveredFiles {
-            cache[url] = fileSize(url) ?? 0
-        }
-        sizeCache = cache
-    }
-
-    private func fileSize(_ url: URL) -> Int64? {
-        FileSizeCalculator.size(of: url)
+        sizeCache[url]
     }
 
     private func removeSingleFile(_ url: URL) {
+        let previousSelection = appState.selectedFiles
         appState.selectedFiles = [url]
         appState.removeSelectedFiles()
+        appState.selectedFiles = previousSelection
     }
 }
 
@@ -424,6 +448,7 @@ struct FileRow: View {
     @State private var isHovering = false
     @State private var showConfirmation = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @AppStorage("settings.general.confirmBeforeDelete") private var confirmBeforeDelete = true
 
     var body: some View {
         Toggle(isOn: $isSelected) {
@@ -460,7 +485,11 @@ struct FileRow: View {
                 .allowsHitTesting(isHovering)
 
                 Button {
-                    showConfirmation = true
+                    if confirmBeforeDelete {
+                        showConfirmation = true
+                    } else {
+                        onRemove()
+                    }
                 } label: {
                     Image(systemName: "trash")
                         .font(.caption)
@@ -498,7 +527,7 @@ struct FileRow: View {
             Button("Cancel", role: .cancel) {}
             Button("Remove", role: .destructive) { onRemove() }
         } message: {
-            Text("This will permanently delete this file. This action cannot be undone.")
+            Text("This item will be moved to the Trash and can be restored.")
         }
     }
 }

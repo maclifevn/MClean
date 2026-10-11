@@ -1,6 +1,25 @@
 import XCTest
 
 final class LocalizationFilesTests: XCTestCase {
+    func testTranslationsPreserveFormatArgumentTypes() throws {
+        let files = try localizableStringsFiles()
+        func dictionary(_ url: URL) throws -> [String: String] {
+            try XCTUnwrap(PropertyListSerialization.propertyList(from: Data(contentsOf: url), options: [], format: nil) as? [String: String])
+        }
+        let english = try dictionary(XCTUnwrap(files["en"]))
+        let pattern = #"%(?:\d+\$)?[-+#0 ]*(?:\d+|\*)?(?:\.(?:\d+|\*))?(?:hh|ll|h|l|L|z|j|t)?[@diuoxXfFeEgGaAcCsSp%]"#
+        let regex = try NSRegularExpression(pattern: pattern)
+        func arguments(_ string: String) -> [String] {
+            regex.matches(in: string, range: NSRange(string.startIndex..., in: string))
+                .compactMap { Range($0.range, in: string).map { String(string[$0]) } }
+                .filter { $0 != "%%" }.sorted()
+        }
+        for (language, url) in files {
+            for (key, value) in try dictionary(url) {
+                XCTAssertEqual(arguments(value), arguments(english[key] ?? key), "\(language): \(key)")
+            }
+        }
+    }
     func testAllLocalizableStringsFilesHaveEnglishKeyParity() throws {
         let localizationFiles = try localizableStringsFiles()
         let englishURL = try XCTUnwrap(

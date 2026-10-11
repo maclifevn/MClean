@@ -115,10 +115,19 @@ private struct SpaceLensPathTicker: View {
 private struct SpaceLensResultView: View {
     @ObservedObject var lens: SpaceLensViewModel
     @State private var showTrashConfirmation = false
+    @State private var pendingNodes: [SpaceLensNode] = []
+    @AppStorage("settings.general.confirmBeforeDelete") private var confirmBeforeDelete = true
 
     var body: some View {
         VStack(spacing: 0) {
             breadcrumbBar
+            if let root = lens.rootNode, root.isPartial {
+                Label(String(format: String(localized: "%lld unavailable items; %lld skipped"),
+                             Int64(root.inaccessibleCount), Int64(root.skippedCount)), systemImage: "info.circle")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .padding(8)
+            }
             Divider()
             HSplitView {
                 BubbleMapView(lens: lens)
@@ -140,41 +149,31 @@ private struct SpaceLensResultView: View {
     // MARK: Breadcrumbs
 
     private var breadcrumbBar: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 4) {
-                if let root = lens.rootNode {
-                    crumb(for: root, isRoot: true, isLast: lens.path.isEmpty)
-                }
-                ForEach(lens.path) { node in
-                    Image(systemName: "chevron.right")
-                        .font(.system(size: 9, weight: .semibold))
-                        .foregroundStyle(.tertiary)
-                    crumb(for: node, isRoot: false, isLast: node.id == lens.path.last?.id)
-                }
-                Spacer(minLength: 0)
+        HStack(spacing: 0) {
+            Button { lens.goBack() } label: {
+                Image(systemName: "chevron.left")
+                    .frame(width: 28, height: 28)
             }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 9)
+            .buttonStyle(.borderless)
+            .disabled(!lens.canGoBack)
+            .help("Back")
+            .accessibilityLabel(Text("Back"))
+            .padding(.leading, 8)
+
+            SpaceLensBreadcrumbStrip(nodes: lens.rootNode.map { [$0] + lens.path } ?? [],
+                                     currentID: lens.currentNode?.id) { node in
+                lens.pop(to: node.id == lens.rootNode?.id ? nil : node)
+            }
+            .frame(height: 38)
         }
         .background(.bar)
-    }
-
-    @ViewBuilder
-    private func crumb(for node: SpaceLensNode, isRoot: Bool, isLast: Bool) -> some View {
-        // A plain `Button` here stopped receiving clicks on macOS 15 (Sequoia):
-        // inside a horizontal ScrollView the scroll gesture wins over the
-        // button's tap. An explicit onTapGesture on a contentShape'd view is
-        // reliable across macOS versions. The current (last) crumb is inert.
-        SpaceLensCrumb(node: node, isRoot: isRoot, isLast: isLast) {
-            lens.pop(to: isRoot ? nil : node)
-        }
     }
 
     // MARK: Child list
 
     private var childList: some View {
         List {
-            ForEach(lens.currentNode?.children ?? []) { node in
+            ForEach(lens.visibleChildren) { node in
                 SpaceLensRow(node: node,
                              isSelected: lens.selection.contains(node.id),
                              toggle: { toggleSelection(node) },
@@ -219,12 +218,25 @@ private struct SpaceLensResultView: View {
                     .monospacedDigit()
             }
             Spacer()
+            Picker("Sort by", selection: $lens.sortOrder) {
+                ForEach(SpaceLensViewModel.SortOrder.allCases) { Text($0.title).tag($0) }
+            }
+            .frame(width: 170)
+            if !lens.includesSmallFiles {
+                Button("Show smaller items") { lens.showSmallerItems() }
+                    .buttonStyle(.bordered)
+            }
             Button("Rescan") {
-                if let root = lens.rootNode { lens.scan(root.url) }
+                lens.rescan()
             }
             .buttonStyle(.bordered)
             Button {
-                showTrashConfirmation = true
+                if confirmBeforeDelete {
+                    pendingNodes = lens.selectedNodes
+                    showTrashConfirmation = true
+                } else {
+                    Task { await lens.trashSelection() }
+                }
             } label: {
                 Label("Move to Trash", systemImage: "trash.fill")
             }
@@ -241,67 +253,12 @@ private struct SpaceLensResultView: View {
             isPresented: $showTrashConfirmation, titleVisibility: .visible
         ) {
             Button("Move to Trash", role: .destructive) {
-                Task { await lens.trashSelection() }
+                let nodes = pendingNodes
+                Task { await lens.trash(nodes) }
             }
             Button("Cancel", role: .cancel) {}
         } message: {
             Text("Items can be restored from the Trash.")
-        }
-    }
-}
-
-/// A single breadcrumb. Uses onTapGesture rather than Button so the tap
-/// isn't eaten by the enclosing horizontal ScrollView on macOS 15.
-private struct SpaceLensCrumb: View {
-    let node: SpaceLensNode
-    let isRoot: Bool
-    let isLast: Bool
-    let onTap: () -> Void
-
-    @State private var hovering = false
-
-    var body: some View {
-        HStack(spacing: 4) {
-            if isRoot {
-                Image(systemName: "internaldrive.fill")
-                    .font(.system(size: 10))
-            }
-            Text(verbatim: node.name)
-                .font(.system(size: 12, weight: isLast ? .semibold : .regular))
-            Text(verbatim: node.formattedSize)
-                .font(.system(size: 11))
-                .foregroundStyle(.secondary)
-                .monospacedDigit()
-        }
-        .padding(.horizontal, 8)
-        .padding(.vertical, 3)
-        .background(
-            Capsule().fill(
-                isLast ? Tint.cyan.opacity(0.14)
-                       : (hovering ? Color.primary.opacity(0.08) : Color.clear)
-            )
-        )
-        .contentShape(Capsule())
-        .onTapGesture {
-            guard !isLast else { return }
-            onTap()
-        }
-        .onHover { hovering = !isLast && $0 }
-        // Pointing-hand cursor on the clickable (non-current) crumbs.
-        .pointerStyleLink(enabled: !isLast)
-        .accessibilityAddTraits(isLast ? [] : .isButton)
-    }
-}
-
-private extension View {
-    /// Shows the link (pointing hand) cursor on hover when enabled. Wrapped so
-    /// the macOS 15-only `.pointerStyle` degrades gracefully on macOS 13–14.
-    @ViewBuilder
-    func pointerStyleLink(enabled: Bool) -> some View {
-        if #available(macOS 15.0, *) {
-            self.pointerStyle(enabled ? .link : nil)
-        } else {
-            self
         }
     }
 }

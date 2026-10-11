@@ -15,7 +15,7 @@ final class SpaceLensEngineTests: XCTestCase {
     ///         blob.bin      81920 B   -> node
     ///     Fixture.app/                -> package leaf
     ///       Contents/exe    30000 B
-    ///     link -> docs                -> symlink, never followed (pruned)
+    ///     link -> docs                -> symlink, excluded
     override func setUpWithError() throws {
         fixtureRoot = FileManager.default.temporaryDirectory
             .appendingPathComponent("SpaceLensFixture-\(UUID().uuidString)")
@@ -52,7 +52,7 @@ final class SpaceLensEngineTests: XCTestCase {
         let root = try await scanFixture()
         // Allocated sizes are block-rounded, so assert against the sum of the
         // children the engine itself reports plus the pruned remainder.
-        let expected = root.children.reduce(root.prunedSize) { $0 + $1.size }
+        let expected = root.children.reduce(root.prunedSize + root.ownSize) { $0 + $1.size }
         XCTAssertEqual(root.size, expected)
         // And the logical payload must be at least the written bytes.
         XCTAssertGreaterThanOrEqual(root.size, 40960 + 20480 + 81920 + 30000)
@@ -78,18 +78,17 @@ final class SpaceLensEngineTests: XCTestCase {
 
     func testSymlinkIsNotFollowed() async throws {
         let root = try await scanFixture(minNodeSize: 0)
-        let link = try XCTUnwrap(root.children.first { $0.name == "link" })
-        XCTAssertFalse(link.isDirectory, "symlink to a directory must stay a leaf")
-        // Following the link would roughly double docs' bytes in the total.
-        let docs = try XCTUnwrap(root.children.first { $0.name == "docs" })
-        XCTAssertLessThan(link.size, docs.size)
+        XCTAssertNil(root.children.first { $0.name == "link" })
+        XCTAssertEqual(root.skippedCount, 1)
+        XCTAssertEqual(root.fileCount, 6)
+        XCTAssertTrue(root.isPartial)
     }
 
     func testSmallFilesArePrunedIntoParentTally() async throws {
         let root = try await scanFixture()
         XCTAssertNil(root.children.first { $0.name == "tiny.txt" })
-        // tiny.txt and the sub-threshold symlink both fold into the tally.
-        XCTAssertEqual(root.prunedCount, 2)
+        // Only the tiny file is grouped; symbolic links are excluded.
+        XCTAssertEqual(root.prunedCount, 1)
         XCTAssertGreaterThanOrEqual(root.prunedSize, 100)
 
         let docs = try XCTUnwrap(root.children.first { $0.name == "docs" })
@@ -97,6 +96,17 @@ final class SpaceLensEngineTests: XCTestCase {
         XCTAssertEqual(docs.prunedCount, 1)
         // Pruned bytes still count toward the directory's size.
         XCTAssertGreaterThanOrEqual(docs.size, 20480 + 81920 + 50)
+    }
+
+    func testSmallDirectoryRemainsNavigableEvenWhenItsFilesAreGrouped() async throws {
+        let root = try await scanFixture(minNodeSize: 200_000)
+        let docs = try XCTUnwrap(root.children.first { $0.name == "docs" })
+        let nested = try XCTUnwrap(docs.children.first { $0.name == "nested" })
+        XCTAssertTrue(docs.isDirectory)
+        XCTAssertEqual(nested.prunedCount, 1)
+        XCTAssertEqual(docs.fileCount, 3)
+        XCTAssertGreaterThan(docs.size, 0)
+        XCTAssertEqual(root.size, root.ownSize + root.prunedSize + root.children.reduce(0) { $0 + $1.size })
     }
 
     func testCancellationThrows() async throws {
@@ -122,11 +132,16 @@ final class SpaceLensEngineTests: XCTestCase {
         let nested = try XCTUnwrap(docs.children.first { $0.name == "nested" })
         let rootBefore = root.size
         let docsBefore = docs.size
+        let filesBefore = root.fileCount
+        let directoriesBefore = root.directoryCount
 
         docs.removeChild(nested)
 
         XCTAssertNil(docs.children.first { $0.name == "nested" })
         XCTAssertEqual(docs.size, docsBefore - nested.size)
         XCTAssertEqual(root.size, rootBefore - nested.size)
+        XCTAssertEqual(root.fileCount, filesBefore - nested.fileCount)
+        XCTAssertEqual(root.directoryCount, directoriesBefore - nested.directoryCount)
+        XCTAssertNil(nested.parent)
     }
 }

@@ -11,6 +11,16 @@ import Combine
 final class WindowOpener {
     static let shared = WindowOpener()
     var open: ((String) -> Void)?
+    weak var mainWindow: NSWindow?
+
+    func showMainWindow() {
+        if let mainWindow, mainWindow.isVisible || mainWindow.isMiniaturized {
+            mainWindow.deminiaturize(nil)
+            mainWindow.makeKeyAndOrderFront(nil)
+        } else {
+            open?("main")
+        }
+    }
     private init() {}
 }
 
@@ -32,7 +42,9 @@ final class MenuBarController: NSObject, NSPopoverDelegate {
     private let statusItem: NSStatusItem
     private let popover = NSPopover()
     private let monitor = SystemMonitor.shared
+    private let monitorOwner = UUID()
     private var cancellable: AnyCancellable?
+    private var lastAccessibilityPercent: Int?
 
     override init() {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
@@ -43,7 +55,7 @@ final class MenuBarController: NSObject, NSPopoverDelegate {
         statusItem.autosaveName = "MCleanSystemMonitor"
         statusItem.isVisible = true
 
-        monitor.start()
+        monitor.start(owner: monitorOwner, samplesDetails: false)
 
         if let button = statusItem.button {
             let image = NSImage(named: "MenuBarIcon") ?? NSImage(
@@ -90,12 +102,14 @@ final class MenuBarController: NSObject, NSPopoverDelegate {
         cancellable = nil
         if popover.isShown { popover.performClose(nil) }
         NSStatusBar.system.removeStatusItem(statusItem)
-        monitor.stop()
+        monitor.stop(owner: monitorOwner)
     }
 
     private func updateAccessibilityStatus() {
         guard let button = statusItem.button else { return }
         let percent = Int((monitor.cpuUsage * 100).rounded())
+        guard percent != lastAccessibilityPercent else { return }
+        lastAccessibilityPercent = percent
         let status = String(format: String(localized: "CPU %lld%%"), Int64(percent))
         button.toolTip = "MClean · \(status)"
         button.setAccessibilityValue(status)

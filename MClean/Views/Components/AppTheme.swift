@@ -23,6 +23,14 @@ enum AppearanceMode: String, CaseIterable, Identifiable {
         }
     }
 
+    var nsAppearance: NSAppearance? {
+        switch self {
+        case .system: return nil
+        case .light: return NSAppearance(named: .aqua)
+        case .dark: return NSAppearance(named: .darkAqua)
+        }
+    }
+
     var colorScheme: ColorScheme? {
         switch self {
         case .system: return nil
@@ -34,13 +42,15 @@ enum AppearanceMode: String, CaseIterable, Identifiable {
 
 @MainActor
 final class ThemeManager: ObservableObject {
+    private init() { applyToApp() }
+    func applyToApp() { NSApplication.shared.appearance = appearance.nsAppearance }
     static let shared = ThemeManager()
 
     @AppStorage("MClean.Appearance") private var rawValue: String = AppearanceMode.system.rawValue
 
     var appearance: AppearanceMode {
         get { AppearanceMode(rawValue: rawValue) ?? .system }
-        set { rawValue = newValue.rawValue; objectWillChange.send() }
+        set { rawValue = newValue.rawValue; objectWillChange.send(); applyToApp() }
     }
 }
 

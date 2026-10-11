@@ -6,11 +6,21 @@ struct CategoryDetailView: View {
 
     @State private var sortDescending: Bool = true
     @State private var searchText = ""
+    @State private var sizeFilter = CleanupSizeFilter.any
+    @State private var ageFilter = CleanupAgeFilter.any
     @State private var showConfirmation = false
+    @State private var pendingItems: [CleanableItem] = []
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @AppStorage("settings.general.confirmBeforeDelete") private var confirmBeforeDelete = true
 
     private var result: CategoryResult? {
         appState.categoryResults[category]
+    }
+
+    private var visibleItems: [CleanableItem] {
+        CleanupReviewFilter(query: searchText, size: sizeFilter, age: ageFilter,
+                            order: sortDescending ? .largest : .smallest)
+            .apply(to: result?.items ?? [])
     }
 
     var body: some View {
@@ -25,6 +35,7 @@ struct CategoryDetailView: View {
                     if result.items.isEmpty {
                         EmptyStateView("All Clean", systemImage: "checkmark.circle", description: "No junk files found in this category.", tint: Tint.green)
                     } else {
+                        reviewFilters
                         fileList(result)
                     }
                 } else {
@@ -47,10 +58,10 @@ struct CategoryDetailView: View {
             ToolbarItemGroup(placement: .automatic) {
                 if let result = result, !result.items.isEmpty {
                     Button("Select All") {
-                        appState.selectAllInCategory(category)
+                        appState.setSelection(true, for: visibleItems)
                     }
                     Button("Deselect All") {
-                        appState.deselectAllInCategory(category)
+                        appState.setSelection(false, for: visibleItems)
                     }
                     Button(action: { sortDescending.toggle() }) {
                         Label {
@@ -69,7 +80,12 @@ struct CategoryDetailView: View {
                     let selectedCount = appState.selectedCountInCategory(category)
                     if selectedSize > 0 {
                         Button {
-                            showConfirmation = true
+                            pendingItems = result?.items.filter(appState.isItemSelected) ?? []
+                            if confirmBeforeDelete || pendingItems.contains(where: { $0.isActionItem }) {
+                                showConfirmation = true
+                            } else {
+                                appState.cleanCategory(category)
+                            }
                         } label: {
                             Label {
                                 Text(cleanItemsLabel(count: selectedCount))
@@ -81,13 +97,16 @@ struct CategoryDetailView: View {
                 }
             }
         }
+        .onChange(of: showConfirmation) { appState.showCleanConfirmation = $0 }
+        .onDisappear { appState.showCleanConfirmation = false }
         .confirmationDialog(cleanConfirmationTitle, isPresented: $showConfirmation, titleVisibility: .visible) {
             Button("Clean", role: .destructive) {
-                appState.cleanCategory(category)
+                appState.cleanCategory(category, itemIDs: Set(pendingItems.map(\.id)))
+                pendingItems = []
             }
             Button("Cancel", role: .cancel) {}
         } message: {
-            Text("This will permanently delete the selected files. This cannot be undone.")
+            Text("Files will be moved to the Trash. Items already in the Trash, simulator runtimes and Docker prune are permanently removed.")
         }
     }
 
@@ -165,10 +184,29 @@ struct CategoryDetailView: View {
 
     // MARK: - File List
 
-    private func fileList(_ result: CategoryResult) -> some View {
-        let items = sortedItems(result.items).filter { item in
-            searchText.isEmpty || item.name.localizedCaseInsensitiveContains(searchText) || item.path.localizedCaseInsensitiveContains(searchText)
+    private var reviewFilters: some View {
+        HStack {
+            Picker("Size", selection: $sizeFilter) {
+                ForEach(CleanupSizeFilter.allCases) { Text(LocalizedStringKey($0.rawValue)).tag($0) }
+            }
+            Picker("Date", selection: $ageFilter) {
+                ForEach(CleanupAgeFilter.allCases) { Text(LocalizedStringKey($0.rawValue)).tag($0) }
+            }
+            let visibleIDs = Set(visibleItems.map(\.id))
+            let hiddenCount = (result?.items ?? []).filter { appState.isItemSelected($0) && !visibleIDs.contains($0.id) }.count
+            if hiddenCount > 0 {
+                Text(String(format: String(localized: "%lld selected items are hidden by filters"), Int64(hiddenCount)))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
         }
+        .padding(.horizontal, 20)
+        .padding(.bottom, 8)
+        .disabled(appState.scanState.isActive)
+    }
+
+    private func fileList(_ result: CategoryResult) -> some View {
+        let items = visibleItems
         return List {
             Section {
                 // No .staggered() here: List is lazy, so a delayed-reveal
@@ -272,10 +310,11 @@ private struct FileRowView: View {
         .animation(reduceMotion ? nil : .easeOut(duration: 0.15), value: isSelected)
         .onHover { hovering = $0 }
         .contextMenu {
-            if !item.path.isEmpty {
+            if !item.isActionItem {
                 Button("Reveal in Finder") {
                     NSWorkspace.shared.selectFile(item.path, inFileViewerRootedAtPath: "")
                 }
+                Button("Always exclude from cleanup") { appState.excludeFromCleanup(item) }
             }
         }
     }

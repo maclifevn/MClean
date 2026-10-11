@@ -4,6 +4,7 @@ build-ci/
 DerivedData/
 *.xcworkspace
 !*.xcworkspace/contents.xcworkspacedata
+!MClean.xcodeproj/project.xcworkspace/
 *.xcuserdata
 xcuserdata/
 
@@ -16,6 +17,11 @@ xcuserdata/
 .build/
 Packages/
 Package.resolved
+!MClean.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved
+
+# Python release tools
+__pycache__/
+*.pyc
 
 # CocoaPods
 Pods/
@@ -38,6 +44,7 @@ fastlane/
 *.p12
 *.cer
 *.mobileprovision
+*sparkle*private*key*
 fastlane/README.md
 asc_api.py
 ExportOptions.plist
@@ -45,6 +52,8 @@ ExportOptions.plist
 # Build artifacts
 *.dmg
 *.zip
+*.app
+dist/
 build/
 
 # Work files (local only)

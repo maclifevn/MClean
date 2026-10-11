@@ -106,6 +106,7 @@ struct AppListView: View {
                     }
                     .width(min: 64, ideal: 72, max: 82)
                 }
+                .disabled(appState.isRemovingAppFiles)
                 .onChange(of: selection) { newValue in
                     guard let id = newValue,
                           let app = appState.installedApps.first(where: { $0.id == id })

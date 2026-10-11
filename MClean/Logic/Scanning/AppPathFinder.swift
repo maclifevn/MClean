@@ -35,7 +35,10 @@ class AppPathFinder {
     private let locations: Locations
     private let sensitivity: Sensitivity
     private var collectionSet: Set<URL> = []
+    private var visitedDepths: [String: Int] = [:]
+    private var cancelled = false
     private let collectionQueue = DispatchQueue(label: "com.maclife.mclean.pathfinder.collection")
+    private let scanQueue: OperationQueue
 
     // Pre-computed cached identifiers (computed once in init, used in hot loop)
     private let normalizedBundleID: String
@@ -55,6 +58,10 @@ class AppPathFinder {
         self.appInfo = appInfo
         self.locations = locations
         self.sensitivity = sensitivity
+        self.scanQueue = OperationQueue()
+        self.scanQueue.name = "com.maclife.mclean.pathfinder.scan"
+        self.scanQueue.qualityOfService = .userInitiated
+        self.scanQueue.maxConcurrentOperationCount = 4
 
         self.normalizedBundleID = appInfo.bundleIdentifier.normalizedForMatching()
         self.bundleLastTwo = appInfo.bundleIdentifier.bundleLastTwoComponents
@@ -81,6 +88,9 @@ class AppPathFinder {
 
     /// Find all files related to this app synchronously.
     func findPaths() -> Set<URL> {
+        collectionSet.removeAll(keepingCapacity: true)
+        visitedDepths.removeAll(keepingCapacity: true)
+        cancelled = false
         collectionSet.insert(appInfo.path)
 
         for location in locations.appSearch.paths {
@@ -99,20 +109,26 @@ class AppPathFinder {
 
     /// Find all files related to this app with parallel location processing.
     func findPathsAsync(completion: @escaping (Set<URL>) -> Void) {
-        collectionSet.insert(appInfo.path)
+        collectionQueue.sync {
+            collectionSet.removeAll(keepingCapacity: true)
+            visitedDepths.removeAll(keepingCapacity: true)
+            cancelled = false
+            collectionSet.insert(appInfo.path)
+        }
 
         let group = DispatchGroup()
         for location in locations.appSearch.paths {
             group.enter()
-            DispatchQueue.global(qos: .userInitiated).async {
+            scanQueue.addOperation {
+                defer { group.leave() }
                 let isLibRoot = self.isLibraryDirectory(location)
                 let maxDepth = isLibRoot ? 2 : 1
                 self.processLocation(location, currentDepth: 0, maxDepth: maxDepth, isLibraryRootSearch: isLibRoot)
-                group.leave()
             }
         }
 
         group.notify(queue: .global(qos: .userInitiated)) {
+            guard !self.isCancelled else { return }
             let containers = self.discoverContainers()
             self.collectionQueue.sync {
                 self.collectionSet.formUnion(containers)
@@ -125,9 +141,30 @@ class AppPathFinder {
         }
     }
 
+    /// Stops an obsolete scan quickly when the user selects another app. We do
+    /// not cancel queued Operations directly because each one owns a balanced
+    /// DispatchGroup leave; the flag lets queued work start, exit immediately,
+    /// and release the group cleanly.
+    func cancel() {
+        collectionQueue.sync { cancelled = true }
+    }
+
     // MARK: - Location Processing
 
     private func processLocation(_ location: String, currentDepth: Int, maxDepth: Int, isLibraryRootSearch: Bool) {
+        guard !isCancelled else { return }
+        let standardizedLocation = URL(fileURLWithPath: location).standardizedFileURL.path
+        let remainingDepth = maxDepth - currentDepth
+        let shouldVisit = collectionQueue.sync { () -> Bool in
+            if let previousDepth = visitedDepths[standardizedLocation],
+               previousDepth >= remainingDepth {
+                return false
+            }
+            visitedDepths[standardizedLocation] = remainingDepth
+            return true
+        }
+        guard shouldVisit else { return }
+
         guard let contents = try? FileManager.default.contentsOfDirectory(atPath: location) else {
             return
         }
@@ -135,7 +172,8 @@ class AppPathFinder {
         var localResults: [URL] = []
         var subdirs: [URL] = []
 
-        for item in contents {
+        for (index, item) in contents.enumerated() {
+            if index.isMultiple(of: 64), isCancelled { return }
             let itemURL = URL(fileURLWithPath: location).appendingPathComponent(item)
             let normalizedName: String
 
@@ -285,11 +323,12 @@ class AppPathFinder {
     // MARK: - Skip Logic
 
     private func shouldSkipItem(_ normalizedName: String, at url: URL) -> Bool {
+        if ProviderPaths.isProviderOwned(url.path) { return true }
         if collectionQueue.sync(execute: { collectionSet.contains(url) }) { return true }
 
         for skip in skipConditions {
             for path in skip.skipPaths {
-                if url.path.hasPrefix(path) { return true }
+                if url.path == path || url.path.hasPrefix(path + "/") { return true }
             }
             if skip.skipPrefixes.contains(where: { normalizedName.hasPrefix($0) }) {
                 if !skip.allowPrefixes.contains(where: { normalizedName.hasPrefix($0) }) {
@@ -298,6 +337,10 @@ class AppPathFinder {
             }
         }
         return false
+    }
+
+    private var isCancelled: Bool {
+        collectionQueue.sync { cancelled }
     }
 
     // MARK: - Container Discovery
@@ -315,6 +358,7 @@ class AppPathFinder {
         ) else { return containers }
 
         for dir in dirs {
+            if isCancelled { break }
             let dirName = dir.lastPathComponent
 
             // UUID-named containers: read the metadata plist for the owning bundle ID

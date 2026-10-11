@@ -72,7 +72,7 @@ struct PermissionSheet: View {
         if coordinator.needsRelaunch {
             return "Access granted — relaunch to apply"
         }
-        return "1-tap setup. We'll detect the change automatically."
+        return "Enable access in Settings, then relaunch MClean."
     }
 
     @ViewBuilder
@@ -169,8 +169,8 @@ struct PermissionSheet: View {
                 stepCell(number: 2, title: "Authenticate",
                          caption: "Touch ID or password.")
                 stepDivider
-                stepCell(number: 3, title: "Done",
-                         caption: "We auto-retry — no need to come back.")
+                stepCell(number: 3, title: "Relaunch MClean",
+                         caption: "Quit and reopen after enabling access.")
             }
             .padding(.vertical, 4)
             .background(
@@ -371,7 +371,7 @@ struct PermissionSheet: View {
 
             Spacer()
 
-            if coordinator.needsRelaunch && !coordinator.hasFullDiskAccess {
+            if !coordinator.hasFullDiskAccess {
                 Button {
                     coordinator.relaunch()
                 } label: {
@@ -380,17 +380,6 @@ struct PermissionSheet: View {
                 .buttonStyle(.borderedProminent)
                 .controlSize(.regular)
                 .keyboardShortcut(.defaultAction)
-            } else if !coordinator.hasFullDiskAccess {
-                Button("I granted it — retry") {
-                    coordinator.refreshStatus()
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
-                        if coordinator.hasFullDiskAccess {
-                            coordinator.dismiss(callRetry: true)
-                        }
-                    }
-                }
-                .buttonStyle(.borderedProminent)
-                .controlSize(.regular)
             }
         }
         .padding(.horizontal, 22)

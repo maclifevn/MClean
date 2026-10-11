@@ -8,15 +8,54 @@ on:
 
 jobs:
   build:
-    runs-on: macos-15
+    name: Build (${{ matrix.runner }})
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [macos-15, macos-15-intel, macos-14]
+    runs-on: ${{ matrix.runner }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1, Node 24
+
+      - name: Record runtime platform
+        run: |
+          sw_vers
+          uname -m
+
+      - name: Select Xcode 16 on macOS 14
+        if: matrix.runner == 'macos-14'
+        run: sudo xcode-select --switch /Applications/Xcode_16.2.app/Contents/Developer
 
       - name: Install XcodeGen
         run: brew install xcodegen
 
       - name: Generate Xcode project
         run: xcodegen generate
+
+      - name: Test
+        run: |
+          xcodebuild test -project MClean.xcodeproj \
+            -scheme MClean \
+            -configuration Debug \
+            -destination 'platform=macOS' \
+            -derivedDataPath build-ci-tests \
+            CODE_SIGN_IDENTITY="" \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGNING_ALLOWED=NO
+
+      - name: Test x86_64 on macOS 14 (Rosetta)
+        if: matrix.runner == 'macos-14'
+        run: |
+          xcodebuild test -project MClean.xcodeproj \
+            -scheme MClean \
+            -configuration Debug \
+            -destination 'platform=macOS,arch=x86_64' \
+            -derivedDataPath build-ci-rosetta-tests \
+            ARCHS=x86_64 \
+            ONLY_ACTIVE_ARCH=YES \
+            CODE_SIGN_IDENTITY="" \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGNING_ALLOWED=NO
 
       - name: Build (Universal Binary)
         run: |
@@ -30,3 +69,21 @@ jobs:
             CODE_SIGN_IDENTITY="" \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGNING_ALLOWED=NO
+
+      - name: Smoke test app runtime
+        run: |
+          app="build/Build/Products/Release/MClean.app"
+          "$app/Contents/MacOS/MClean" --version
+          "$app/Contents/MacOS/MClean" disk-info
+          set +e
+          "$app/Contents/MacOS/MClean" scan --category __invalid_category__
+          status=$?
+          set -e
+          test "$status" -eq 2
+
+      - name: Smoke test x86_64 on macOS 14 (Rosetta)
+        if: matrix.runner == 'macos-14'
+        run: |
+          app="build/Build/Products/Release/MClean.app"
+          arch -x86_64 "$app/Contents/MacOS/MClean" --version
+          arch -x86_64 "$app/Contents/MacOS/MClean" disk-info

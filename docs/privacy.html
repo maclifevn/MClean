@@ -18,14 +18,14 @@
 <p>MClean is a Mac cleaner and app uninstaller for macOS. Your privacy is the default, not a feature.</p>
 
 <h2>What MClean collects</h2>
-<p>Nothing. MClean has <strong>no servers, no analytics, no telemetry, no crash reporting, no accounts, and no ads</strong>. It makes <strong>no network connections</strong> and does not require an internet connection to operate. The app does not know you exist.</p>
+<p>Nothing. MClean has <strong>no servers, no analytics, no telemetry, no crash reporting, no accounts, and no ads</strong>. File scanning works offline. Sparkle update checks and downloads contact GitHub; managed app updates use Homebrew and its normal repositories. Automatic checks require user opt-in; anonymous system profiling is disabled by default. Scan results are not uploaded. The app does not know you exist.</p>
 
 <h2>What stays on your Mac</h2>
-<p>Everything MClean does happens locally. Scan results, your settings, your excluded folders, and your ignored-orphan list are stored only on your Mac in the app's preferences. None of it is ever transmitted anywhere.</p>
+<p>File analysis happens locally. Scan results, your settings, your excluded folders, and your ignored-orphan list are stored only on your Mac in the app's preferences. None of it is ever transmitted anywhere.</p>
 
 <h2>What MClean removes</h2>
 <ul>
-  <li>Everything MClean deletes is moved to the <strong>Trash</strong> via the system API — nothing is shredded or force-unlinked, so anything removed by mistake can be dragged back.</li>
+  <li>Ordinary files removed by MClean are moved to the <strong>Trash</strong> via the system API. Emptying Trash, removing simulator runtimes, Docker prune and deleting local Time Machine snapshots are permanent actions; review their confirmations before continuing.</li>
   <li>You review every item, with its real filesystem path, before anything is removed.</li>
   <li>High-risk system paths are hard-excluded in the source code and cannot be selected for deletion.</li>
 </ul>

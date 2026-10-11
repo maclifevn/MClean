@@ -7,6 +7,11 @@ options:
   createIntermediateGroups: true
   defaultConfig: Release
 
+packages:
+  Sparkle:
+    url: https://github.com/sparkle-project/Sparkle
+    exactVersion: 2.10.0
+
 settings:
   base:
     SWIFT_VERSION: "5.9"
@@ -22,8 +27,8 @@ settings:
     CODE_SIGN_ENTITLEMENTS: "MClean/MClean.entitlements"
     INFOPLIST_FILE: "MClean/Info.plist"
     PRODUCT_BUNDLE_IDENTIFIER: "com.maclife.mclean"
-    MARKETING_VERSION: "1.0.4"
-    CURRENT_PROJECT_VERSION: "5"
+    MARKETING_VERSION: "1.0.5"
+    CURRENT_PROJECT_VERSION: "6"
     GENERATE_INFOPLIST_FILE: "NO"
     ASSETCATALOG_COMPILER_APPICON_NAME: "AppIcon"
     COMBINE_HIDPI_IMAGES: "YES"
@@ -41,6 +46,8 @@ targets:
     platform: macOS
     sources:
       - MClean
+    dependencies:
+      - package: Sparkle
     settings:
       base:
         PRODUCT_NAME: MClean
@@ -55,6 +62,13 @@ targets:
     platform: macOS
     sources:
       - MCleanTests
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.maclife.mclean.tests
+        GENERATE_INFOPLIST_FILE: "YES"
+        INFOPLIST_FILE: ""
+        CODE_SIGN_ENTITLEMENTS: ""
+        ASSETCATALOG_COMPILER_APPICON_NAME: ""
     dependencies:
       - target: MClean
 

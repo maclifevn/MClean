@@ -5,6 +5,21 @@ import SwiftUI
 class AppDelegate: NSObject, NSApplicationDelegate {
     /// Owns the optional menu-bar status item. Nil until the monitor is enabled.
     private var menuBarController: MenuBarController?
+    private var terminationTask: Task<Void, Never>?
+
+    func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
+        guard FileOperationTracker.shared.isBusy else { return .terminateNow }
+        if terminationTask == nil {
+            terminationTask = Task { [weak self] in
+                while FileOperationTracker.shared.isBusy {
+                    try? await Task.sleep(nanoseconds: 250_000_000)
+                }
+                self?.terminationTask = nil
+                sender.reply(toApplicationShouldTerminate: true)
+            }
+        }
+        return .terminateLater
+    }
 
     /// Normally MClean quits when its window closes. When the menu-bar system
     /// monitor is enabled the app stays resident so the meters keep updating in
@@ -90,6 +105,7 @@ struct MCleanApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
     @StateObject private var appState = AppState()
     @StateObject private var theme = ThemeManager.shared
+    @StateObject private var updater = UpdateService.shared
     @AppStorage("MClean.OnboardingComplete") private var onboardingComplete = false
 
     init() {
@@ -114,7 +130,10 @@ struct MCleanApp: App {
                 }
             }
             .environmentObject(theme)
-            .preferredColorScheme(theme.appearance.colorScheme)
+            .onAppear { if onboardingComplete { startUpdater() } }
+            .onChange(of: onboardingComplete) { complete in
+                if complete { startUpdater() }
+            }
             // Record the openWindow action so the menu-bar popover can reopen
             // this window after it's been closed (the popover lives outside the
             // scene graph and can't use openWindow itself).
@@ -128,9 +147,11 @@ struct MCleanApp: App {
             CommandGroup(replacing: .newItem) {}
             CommandMenu("Updates") {
                 Button("Check for Updates") {
+                    NSApp.activate(ignoringOtherApps: true)
                     UpdateService.shared.checkForUpdates()
                 }
                 .keyboardShortcut("u", modifiers: [.command, .shift])
+                .disabled(!updater.canCheckForUpdates || !updater.hasStarted)
             }
         }
 
@@ -145,5 +166,11 @@ struct MCleanApp: App {
         // unconditional one sets up status-item machinery that hangs the XCTest
         // host. The AppKit controller is only created when enabled and never
         // under tests, sidestepping both problems.
+    }
+
+    private func startUpdater() {
+        updater.start { [weak appState] in
+            appState?.canInstallAppUpdate == true
+        }
     }
 }
