@@ -8,9 +8,19 @@ on:
 
 jobs:
   build:
-    runs-on: macos-15
+    name: Build (${{ matrix.runner }})
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [macos-15, macos-15-intel, macos-14]
+    runs-on: ${{ matrix.runner }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1, Node 24
+
+      - name: Record runtime platform
+        run: |
+          sw_vers
+          uname -m
 
       - name: Install XcodeGen
         run: brew install xcodegen
@@ -41,3 +51,14 @@ jobs:
             CODE_SIGN_IDENTITY="" \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGNING_ALLOWED=NO
+
+      - name: Smoke test app runtime
+        run: |
+          app="build/Build/Products/Release/MClean.app"
+          "$app/Contents/MacOS/MClean" --version
+          "$app/Contents/MacOS/MClean" disk-info
+          set +e
+          "$app/Contents/MacOS/MClean" scan --category __invalid_category__
+          status=$?
+          set -e
+          test "$status" -eq 2
