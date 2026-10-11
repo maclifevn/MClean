@@ -22,6 +22,10 @@ jobs:
           sw_vers
           uname -m
 
+      - name: Select Xcode 16 on macOS 14
+        if: matrix.runner == 'macos-14'
+        run: sudo xcode-select --switch /Applications/Xcode_16.2.app/Contents/Developer
+
       - name: Install XcodeGen
         run: brew install xcodegen
 
