@@ -1,3 +1,34 @@
+# MClean 1.0.6 — phát hành 11/10/2026
+
+**[Version 1.0.6 / build 7 đã phát hành trên GitHub](https://github.com/maclifevn/MClean/releases/tag/v1.0.6).** [PR #9](https://github.com/maclifevn/MClean/pull/9) đã merge, sửa khung nền Dashboard phía sau unified toolbar khi cửa sổ rộng và khi đưa con trỏ lên thanh tiêu đề. Bố cục các card được giữ nguyên. Tag `v1.0.6` trỏ tới source **`d916e1f5a79ecbd5476b7995622f5db1b9c7f88f`**.
+
+- [Build CI](https://github.com/maclifevn/MClean/actions/runs/38123158041) đạt trên macOS 15 Apple Silicon, macOS 15 Intel và macOS 14, kèm x86_64 qua Rosetta.
+- [Pipeline ký/notarize](https://github.com/maclifevn/MClean/actions/runs/38123161270) đạt trên cùng source. Dùng chính artifact CI cho release; không rebuild hay thay byte sau kiểm chứng.
+- QA giao diện của PR #9 dùng app thử riêng với `MainWindow`/`DashboardView` thực tế, dữ liệu giả, cửa sổ rộng và con trỏ ở toolbar, ở System/Light/Dark trên macOS 27.0. CI không thay thế QA giao diện thủ công trên macOS 14/15.
+
+| Mục | Kết quả |
+|---|---|
+| Bundle / version | `com.maclife.mclean`, `1.0.6` / build `7`, minimum macOS `13.0` |
+| Chữ ký | Developer ID Application Team `CF5PGH3KGK`, certificate SHA-1 `1D07FE9B5F100897730FD6545760C1D3237C6E77`, hardened runtime, secure timestamp |
+| Kiến trúc | `arm64` và `x86_64`; CLI version chạy đúng trên cả hai |
+| App notarization | **Accepted**, `336aa233-96d9-4c0d-bc5e-77f6e19978c5`, không có issues |
+| DMG notarization | **Accepted**, `b190ad9a-9df8-4c28-9d6f-cea9a6ad04c1`, không có issues |
+| Ticket / Gatekeeper | App và DMG được staple; strict codesign, stapler validate, Gatekeeper và hdiutil verify đạt |
+| Đóng gói | ZIP và DMG chứa cùng app đã ký/staple; đối chiếu mọi file và symlink đạt |
+| Sparkle | Giữ public key của 1.0.5; SDK xác minh feed/ZIP và CryptoKit xác minh ZIP bằng key trong app; feed chứa build 7 và giữ nguyên URL/chữ ký ZIP build 6 |
+| Tải công khai | Bốn asset của release tải về không dùng authentication, byte/checksum khớp artifact đã kiểm chứng |
+
+```text
+744dc260c04ef5fde2e78c77d066879da3ba8268273ba6cb821ca41c1ca5f6c2  MClean-1.0.6.dmg
+47bb693bd0cbef407dceff8884829450e545b15447c96129531abf2fa7a85fec  MClean-1.0.6.zip
+```
+
+Feed đã ký được upload lên release `appcast` sau khi asset `v1.0.6` công khai và tải được. `homebrew/mclean.rb` dùng checksum ZIP 1.0.6; repo tap riêng chưa được tạo. Bằng chứng nằm trong `/Users/maclife/.codex/backups/MClean-release-1.0.6-20261011-145709/`: artifact CI, notary logs, log Gatekeeper/staple/codesign, hash nội dung app và `publication/`.
+
+Các hồ sơ 1.0.5 bên dưới được giữ nguyên theo thời điểm kiểm tra; không coi việc phát hành 1.0.6 là đã hoàn tất các phép thử FDA/Settings thủ công còn ghi trong hồ sơ cũ.
+
+---
+
 # MClean 1.0.5 — phát hành 11/10/2026
 
 **[Version 1.0.5 / build 6 đã phát hành trên GitHub](https://github.com/maclifevn/MClean/releases/tag/v1.0.5).** Tag `v1.0.5` trỏ tới source build `0e33e42c831b87ee3db382d6ae545fd8bcc656a8`, gồm [PR #7](https://github.com/maclifevn/MClean/pull/7) và bộ nhận diện mới của [PR #8](https://github.com/maclifevn/MClean/pull/8). [CI của đúng commit trên main](https://github.com/maclifevn/MClean/actions/runs/38120654772) đạt trên macOS 15 Apple Silicon, macOS 15 Intel và macOS 14 Apple Silicon, kèm x86_64 qua Rosetta trên macOS 14. Đủ **6/6 secrets**; macOS 13 đã được bỏ khỏi phạm vi QA theo yêu cầu chủ dự án.
