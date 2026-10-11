@@ -13,6 +13,12 @@ import Darwin
 final class SystemMonitor: ObservableObject {
     static let shared = SystemMonitor()
 
+    struct DiskSample: Sendable {
+        let total: Int64
+        let used: Int64
+    }
+    typealias DiskSampler = @Sendable () -> DiskSample?
+
     /// 0.0 - 1.0 fraction of total CPU time spent non-idle since the last sample.
     @Published private(set) var cpuUsage: Double = 0
     @Published private(set) var memoryUsed: Int64 = 0
@@ -41,11 +47,15 @@ final class SystemMonitor: ObservableObject {
     private var detailOwners = Set<UUID>()
     private var timerGeneration = UUID()
     private let sampleAction: (() -> Void)?
+    private let diskSampler: DiskSampler
+    private let diskQueue = DispatchQueue(label: "com.maclife.mclean.disk-monitor", qos: .utility)
+    private(set) var diskSampleInFlight = false
     private(set) var samplingInterval: TimeInterval?
     var isSampling: Bool { timer != nil }
 
-    init(sampleAction: (() -> Void)? = nil) {
+    init(sampleAction: (() -> Void)? = nil, diskSampler: DiskSampler? = nil) {
         self.sampleAction = sampleAction
+        self.diskSampler = diskSampler ?? Self.readDiskSample
     }
 
     func start(owner: UUID, interval: TimeInterval = 2.0, samplesDetails: Bool = true) {
@@ -161,17 +171,36 @@ final class SystemMonitor: ObservableObject {
     // MARK: - Disk
 
     private func sampleDisk() {
+        // A volume query can wait on a filesystem or macOS service. Never run
+        // it on the main actor, including the first sample during app launch.
+        // Keep at most one read in flight while the timer continues sampling CPU.
+        guard !diskSampleInFlight else { return }
+        diskSampleInFlight = true
+        let generation = timerGeneration
+        let sampler = diskSampler
+        diskQueue.async { [weak self] in
+            let reading = sampler()
+            Task { @MainActor [weak self] in
+                guard let self else { return }
+                self.diskSampleInFlight = false
+                guard self.timerGeneration == generation, !self.detailOwners.isEmpty,
+                      let reading else { return }
+                self.diskTotal = reading.total
+                self.diskUsed = reading.used
+            }
+        }
+    }
+
+    nonisolated private static func readDiskSample() -> DiskSample? {
         let url = URL(fileURLWithPath: NSHomeDirectory())
         guard let values = try? url.resourceValues(forKeys: [
             .volumeTotalCapacityKey,
-            .volumeAvailableCapacityForImportantUsageKey,
-        ]) else { return }
-
-        if let total = values.volumeTotalCapacity {
-            diskTotal = Int64(total)
-        }
-        if let available = values.volumeAvailableCapacityForImportantUsage {
-            diskUsed = max(0, diskTotal - available)
-        }
+            // Live usage needs actual free space. Important-usage capacity also
+            // asks CacheDelete to calculate purgeable data and can stall on Ventura.
+            .volumeAvailableCapacityKey,
+        ]), let total = values.volumeTotalCapacity,
+            let available = values.volumeAvailableCapacity else { return nil }
+        let capacity = Int64(total)
+        return DiskSample(total: capacity, used: max(0, min(capacity, capacity - Int64(available))))
     }
 }

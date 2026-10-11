@@ -47,6 +47,48 @@ final class MonitoringLifecycleTests: XCTestCase {
         XCTAssertEqual(samples, stoppedCount)
     }
 
+    func testSlowDiskReadKeepsMainActorResponsiveAndCannotPublishAfterStop() async throws {
+        let entered = expectation(description: "Disk read starts in the background")
+        let release = DispatchSemaphore(value: 0)
+        let monitor = SystemMonitor(diskSampler: {
+            XCTAssertFalse(Thread.isMainThread)
+            entered.fulfill()
+            _ = release.wait(timeout: .now() + 5)
+            return .init(total: 100, used: 40)
+        })
+        let owner = UUID()
+        defer { release.signal(); monitor.stop(owner: owner) }
+        monitor.start(owner: owner, interval: 0.1)
+        await fulfillment(of: [entered], timeout: 2)
+        // Main-actor work and timer ticks can continue while the read is blocked.
+        try await Task.sleep(nanoseconds: 250_000_000)
+        XCTAssertTrue(monitor.diskSampleInFlight)
+        XCTAssertEqual(monitor.diskTotal, 0)
+        monitor.stop(owner: owner)
+        release.signal()
+        for _ in 0..<100 where monitor.diskSampleInFlight {
+            try await Task.sleep(nanoseconds: 20_000_000)
+        }
+        XCTAssertFalse(monitor.diskSampleInFlight)
+        XCTAssertEqual(monitor.diskTotal, 0, "A stopped session must discard an outstanding read")
+    }
+
+    func testBackgroundDiskReadPublishesToActiveMonitor() async throws {
+        let monitor = SystemMonitor(diskSampler: {
+            XCTAssertFalse(Thread.isMainThread)
+            return .init(total: 100, used: 40)
+        })
+        let owner = UUID()
+        monitor.start(owner: owner, interval: 60)
+        defer { monitor.stop(owner: owner) }
+        for _ in 0..<100 where monitor.diskTotal == 0 {
+            try await Task.sleep(nanoseconds: 20_000_000)
+        }
+        XCTAssertEqual(monitor.diskTotal, 100)
+        XCTAssertEqual(monitor.diskUsed, 40)
+        XCTAssertEqual(monitor.diskFraction, 0.4)
+    }
+
     func testPausingKeepsTheLastSampleAndResumingResetsTheBaseline() async throws {
         let monitor = ProcessResourceMonitor()
         monitor.setActive(true)
