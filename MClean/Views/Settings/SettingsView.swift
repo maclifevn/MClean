@@ -409,7 +409,12 @@ struct AboutSettingsView: View {
         Form {
             Section {
                 HStack {
-                    MCleanAppIcon(size: 64, shadow: true)
+                    Image("BrandMark")
+                        .resizable()
+                        .interpolation(.high)
+                        .scaledToFit()
+                        .frame(width: 64, height: 64)
+                        .accessibilityHidden(true)
                     VStack(alignment: .leading, spacing: 4) {
                         Text("MClean")
                             .font(.title2.bold())

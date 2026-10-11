@@ -10,7 +10,7 @@
   <b>繁體中文</b>
 </p>
 
-<h1 align="center">MClean</h1>
+<h1 align="center"><img src="assets/branding/logo.png" alt="" width="72"><br>MClean</h1>
 
 <p align="center">
   <b>免費、開源的 macOS 應用程式管理與系統清理工具。</b><br>
