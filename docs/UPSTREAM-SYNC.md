@@ -1,5 +1,7 @@
 # Đồng bộ PureMac vào MClean, giữ giao diện hiện có
 
+> Hồ sơ này ghi lại lượt đồng bộ ban đầu. Lượt chuẩn bị production tiếp theo đã nâng **1.0.5 / build 6**, cấu hình sáu secrets và notarize app/DMG; source được đưa lên nhánh chuẩn bị để review và chạy dry run. Trạng thái mới nhất ở [PRODUCTION-RELEASE.md](PRODUCTION-RELEASE.md).
+
 Ngày đối chiếu: **11/10/2026**. Nhánh: `codex/sync-puremac-keep-interface`.
 
 Nguồn: [momenbasel/PureMac](https://github.com/momenbasel/PureMac), app **3.1.0**, revision [`0eca648d48986b7ea91f56ffe816f817a719c421`](https://github.com/momenbasel/PureMac/commit/0eca648d48986b7ea91f56ffe816f817a719c421). Lấy lại remote trước khi ghép; không chỉ dùng snapshot 3.0 của lần audit trước. MClean bắt đầu tại `4604fe9`, có các chỉnh sửa chưa commit được giữ lại. Hai repo không có merge-base chung; ghép theo từng phần và kiểm thử hành vi của fork.
