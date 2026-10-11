@@ -42,7 +42,9 @@ struct DashboardView: View {
                 colors: [Tint.blue.opacity(0.08), Tint.purple.opacity(0.05), .clear],
                 startPoint: .top, endPoint: .bottom
             )
-            .ignoresSafeArea()
+            // Extending this content-width wash through the top safe area
+            // paints a visible rectangle behind the native unified toolbar.
+            .ignoresSafeArea(.container, edges: .bottom)
 
             ScrollView {
                 VStack(alignment: .leading, spacing: 20) {
@@ -85,6 +87,9 @@ struct DashboardView: View {
                 .padding(.horizontal, 28)
                 .padding(.vertical, 24)
                 .frame(maxWidth: 920, alignment: .leading)
+                // Keep the native scroll surface (and its toolbar backdrop)
+                // full-width while the dashboard cards stay centered.
+                .frame(maxWidth: .infinity)
                 .animation(reduceMotion ? nil : MotionTokens.gentle, value: appState.scanState)
             }
 
