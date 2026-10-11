@@ -10,7 +10,7 @@
   <a href="README.zh-Hant.md">繁體中文</a>
 </p>
 
-<h1 align="center">MClean</h1>
+<h1 align="center"><img src="assets/branding/logo.png" alt="" width="72"><br>MClean</h1>
 
 <p align="center">
   <b>免费、开源的 macOS 应用管理器与系统清理工具。</b><br>
