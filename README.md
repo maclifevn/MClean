@@ -150,6 +150,6 @@ Ngày 11/10/2026, MClean đã nhận cập nhật chức năng PureMac 3.1.0 đ�
 
 Tệp thường được đưa vào Thùng rác. Dọn mục đã trong Thùng rác, xóa runtime, Docker prune và xóa snapshot Time Machine là thao tác không thể hoàn tác qua Thùng rác. Sparkle cập nhật MClean qua GitHub; công cụ cập nhật các ứng dụng khác dùng Homebrew. Các thao tác cập nhật có kết nối mạng. Không có telemetry.
 
-Chi tiết phạm vi ghép và kiểm chứng: [UPSTREAM-SYNC.md](docs/UPSTREAM-SYNC.md). Source đang chuẩn bị bản **1.0.5 / build 6**; phiên bản đã phát hành và checksum Homebrew vẫn trỏ bản 1.0.4 hiện có, được cập nhật sau khi phát hành bản notarized.
+Chi tiết phạm vi ghép và kiểm chứng: [UPSTREAM-SYNC.md](docs/UPSTREAM-SYNC.md). **[MClean 1.0.5 / build 6](https://github.com/maclifevn/MClean/releases/tag/v1.0.5)** đã phát hành với bộ nhận diện Clean M, bản Universal ký Developer ID và được Apple notarize/staple. Checksum Homebrew khớp ZIP của release này.
 
 Thiết lập khóa ký, phát hành appcast và kiểm thử macOS 15: [SPARKLE-UPDATES.md](docs/SPARKLE-UPDATES.md). Người dùng bản chưa có Sparkle cần cài bản có Sparkle đầu tiên một lần để nhận cập nhật trong app về sau.

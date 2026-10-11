@@ -1,10 +1,35 @@
-# Chuẩn bị MClean 1.0.5 — 11/10/2026
+# MClean 1.0.5 — phát hành 11/10/2026
 
-**Version 1.0.5 / build 6 chưa phát hành.** [PR #7](https://github.com/maclifevn/MClean/pull/7) đã merge vào `main` tại `6046a37`; [CI cuối của PR](https://github.com/maclifevn/MClean/actions/runs/38117992960) đạt **200 test / 0 lỗi** trên macOS 15 Apple Silicon, macOS 15 Intel và macOS 14 Apple Silicon, kèm 200 test x86_64 qua Rosetta trên macOS 14. Đủ **6/6 secrets**. Chủ dự án yêu cầu chỉ merge, chưa xuất bản release hoặc feed production; macOS 13 đã được bỏ khỏi phạm vi QA.
+**[Version 1.0.5 / build 6 đã phát hành trên GitHub](https://github.com/maclifevn/MClean/releases/tag/v1.0.5).** Tag `v1.0.5` trỏ tới source build `0e33e42c831b87ee3db382d6ae545fd8bcc656a8`, gồm [PR #7](https://github.com/maclifevn/MClean/pull/7) và bộ nhận diện mới của [PR #8](https://github.com/maclifevn/MClean/pull/8). [CI của đúng commit trên main](https://github.com/maclifevn/MClean/actions/runs/38120654772) đạt trên macOS 15 Apple Silicon, macOS 15 Intel và macOS 14 Apple Silicon, kèm x86_64 qua Rosetta trên macOS 14. Đủ **6/6 secrets**; macOS 13 đã được bỏ khỏi phạm vi QA theo yêu cầu chủ dự án.
 
 Nhận diện mới được chọn là **mẫu 04 — Clean M**: chữ M kết hợp nét chổi, màu xanh–ngọc, icon ứng dụng có nền bo góc và icon menubar template đơn sắc 18/36 px. Master PNG trong `docs/assets/branding/`; chạy `swift scripts/generate-appicon.swift` để xuất lại bộ asset, và `swift scripts/preview-brand-assets.swift` để xem các kích thước thực. Logo riêng dùng trong About; onboarding và popover dùng icon của bundle.
 
-Kết quả ký/notarize, checksum và artifact ở các phần bên dưới là **bằng chứng lịch sử trước khi thay bộ nhận diện**. [Release dry run mới nhất trước đổi icon](https://github.com/maclifevn/MClean/actions/runs/38117213521) đạt trên `c12a70c` với 200 test; app/DMG được Apple chấp nhận, staple/Gatekeeper và chữ ký Sparkle đạt. Cần tạo lại artifact ký/notarize từ source có bộ nhận diện mới trước khi phát hành. QA thủ công còn lại được ghi trong PR #7: đọc thư mục được bảo vệ sau cấp FDA với SIP bật, chuyển quyền từ bản 1.0.4 công khai, và hoàn tất Settings trên candidate cuối.
+## Artifact đã phát hành với bộ nhận diện mới
+
+Phát hành chính DMG/ZIP local đã chuẩn bị để chủ dự án test; không rebuild hoặc thay byte giữa bản test và release. Feed production đã ký được publish sau các asset phiên bản; `homebrew/mclean.rb` dùng checksum ZIP bên dưới.
+
+| Mục | Kết quả |
+|---|---|
+| Bundle / version | `com.maclife.mclean`, `1.0.5` / build `6` |
+| Chữ ký | `Developer ID Application: Anh Tuan Vu Nguyen (CF5PGH3KGK)`, hardened runtime, secure timestamp |
+| Kiến trúc | `arm64` và `x86_64` |
+| App notarization | **Accepted**, `cf667f63-cba9-4ad5-8bbb-c9e7add442d2`, không có issues |
+| DMG notarization | **Accepted**, `9579e025-8f96-4fb5-a0d9-c5b68a52b000`, không có issues |
+| Ticket / Gatekeeper | App và DMG được staple; strict codesign, stapler validate và Gatekeeper đạt |
+| Đóng gói | Mở DMG chỉ đọc và giải nén ZIP: cùng app đã ký/staple, so sánh toàn bộ file và symlink đạt |
+| Nhận diện | AppIcon mới; BrandMark màu và MenuBarIcon template 18 pt được đọc từ bundle export |
+| Sparkle | Ed25519 của ZIP được CryptoKit xác minh bằng public key trong app; feed và ZIP được Sparkle SDK xác minh |
+
+```text
+acbb003e5d11cabcbc759830d2d85b7982e3154527e8785803cb71a6c8d2f957  MClean-1.0.5.dmg
+556f49178a7bb70d2c87f2de3199c41de752a5a44310dcb9e64763ab21ba0a0f  MClean-1.0.5.zip
+```
+
+Bằng chứng local: `/Users/maclife/.codex/backups/MClean-1.0.5-icon04-localtest-20261011-141741/`, gồm `BUILD-INFO.json`, logs ký/notary/staple/Gatekeeper, hash nội dung app và `publication/` chứa feed/release notes cùng kiểm chứng upload.
+
+## Hồ sơ chuẩn bị trước phát hành
+
+**Các phần bên dưới giữ bằng chứng lịch sử trước khi thay bộ nhận diện**, với notary ID và checksum riêng của các build cũ. [Release dry run trước đổi icon](https://github.com/maclifevn/MClean/actions/runs/38117213521) đạt trên `c12a70c` với 200 test. Các phép thử thủ công chưa hoàn tất được ghi trong PR #7: đọc thư mục được bảo vệ sau cấp FDA với SIP bật, chuyển quyền từ bản 1.0.4 công khai và hoàn tất Settings trên candidate cuối; không coi việc ký/notarize hoặc phát hành là bằng chứng các phép thử này đã đạt.
 
 Giao diện MClean hiện có được giữ. Lượt này tăng version/build trong `project.yml`, project Xcode và fallback CLI; sửa preflight credentials và thứ tự đóng gói trong pipeline. Các bản sửa chức năng thuộc lượt audit ngay trước đó, được ghi tại [PRODUCTION-AUDIT.md](PRODUCTION-AUDIT.md). Host đã build/archive lại version production; CI chạy lại đầy đủ XCTest trên macOS 15 arm64.
 
