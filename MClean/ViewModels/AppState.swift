@@ -182,10 +182,12 @@ final class AppState: ObservableObject {
     init(
         performStartupTasks: Bool = true,
         locationsProvider: @escaping () -> Locations = Locations.init,
-        appFileScanner: @escaping AppFileScanner = AppState.defaultAppFileScanner
+        appFileScanner: AppFileScanner? = nil
     ) {
         self.locationsProvider = locationsProvider
-        self.appFileScanner = appFileScanner
+        // Resolve the default on the main actor; older Swift compilers evaluate
+        // default arguments outside the initializer's actor context.
+        self.appFileScanner = appFileScanner ?? AppState.defaultAppFileScanner
 
         // Listen for right-click "Uninstall with MClean" hand-offs from the
         // Finder Services handler in AppDelegate.
