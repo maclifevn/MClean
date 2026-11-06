@@ -51,7 +51,7 @@ enum SearchSensitivity: String, CaseIterable, Identifiable, Codable {
         switch self {
         case .strict: return "Exact bundle ID and name matches only. Safest option."
         case .enhanced: return "Includes partial name matching and bundle ID components."
-        case .deep: return "Includes company-name and broader bundle identifier matching."
+        case .deep: return "Matches publisher and product names separately."
         }
     }
 }

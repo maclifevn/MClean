@@ -17,18 +17,6 @@ class Locations: ObservableObject {
         var paths: [String]
     }
 
-    // Standard macOS Library subdirectories.
-    // Used to determine if depth=2 matches should add the parent directory (vendor folders)
-    // or the matched item itself (standard system folders).
-    static let standardLibrarySubdirectories: Set<String> = [
-        "Application Scripts", "Application Support", "Caches",
-        "Containers", "Group Containers", "HTTPStorages",
-        "Internet Plug-Ins", "LaunchAgents", "LaunchDaemons",
-        "Logs", "Preferences", "PreferencePanes",
-        "PrivilegedHelperTools", "Saved Application State",
-        "Services", "WebKit", "Extensions", "Frameworks"
-    ]
-
     let cacheDir: String
     let tempDir: String
     var appSearch: SearchCategory
@@ -45,7 +33,6 @@ class Locations: ObservableObject {
             // .ssh, .aws, .kube by normalized app-name ("claude" matching
             // ".claude") and invites data loss when uninstalling unrelated
             // webapps. Scoped subdirs below are still scanned.
-            "\(home)/Applications",
             // User Library
             "\(home)/Library",
             "\(home)/Library/Application Scripts",
@@ -78,7 +65,6 @@ class Locations: ObservableObject {
             "\(home)/Library/Services",
             "\(home)/Library/WebKit",
             // System-wide
-            "/Applications",
             "/Users/Shared",
             "/Users/Shared/Library/Application Support",
             "/Library",

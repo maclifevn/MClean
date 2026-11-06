@@ -23,17 +23,39 @@ struct AppListView: View {
     }
 
     var body: some View {
-        HStack(spacing: 0) {
-            // This is intentionally fixed instead of user-resizable. Restored
-            // HSplitView positions could compress the pane below its declared
-            // minimum or let it crowd the app-wide sidebar.
-            appTable
-                .frame(width: 300)
+        VStack(spacing: 0) {
+            HStack(spacing: 0) {
+                appTable
+                    .frame(width: 300)
 
-            Divider()
+                Divider()
 
-            fileDetail
-                .frame(minWidth: 380, maxWidth: .infinity)
+                fileDetail
+                    .frame(minWidth: 380, maxWidth: .infinity)
+            }
+
+            if let report = appState.appRemovalReport {
+                Divider()
+                AppRemovalSummary(
+                    report: report,
+                    onReveal: { appState.revealForUninstall($0, app: report.app) },
+                    onRequestAccess: appState.requestFullDiskAccessAndRetryUninstall,
+                    onDismiss: { appState.appRemovalReport = nil }
+                )
+                .id(report.id)
+            }
+            if let status = appState.appUninstallStatus {
+                Divider()
+                HStack {
+                    Text(status)
+                    Spacer()
+                    Button("Done") { appState.appUninstallStatus = nil }
+                }
+                .font(.callout)
+                .controlSize(.small)
+                .padding(12)
+                .background(.bar)
+            }
         }
         .task {
             // Lazy first load: installed apps are no longer walked at launch
@@ -58,7 +80,16 @@ struct AppListView: View {
                 } label: {
                     Label("Refresh", systemImage: "arrow.clockwise")
                 }
+                .disabled(appState.isRemovingAppFiles || appState.isOpeningAppUninstaller)
             }
+        }
+        .alert("Removal Failed", isPresented: Binding(
+            get: { appState.appUninstallNotice != nil },
+            set: { if !$0 { appState.appUninstallNotice = nil } }
+        )) {
+            Button("OK", role: .cancel) { appState.appUninstallNotice = nil }
+        } message: {
+            Text(appState.appUninstallNotice ?? "")
         }
     }
 
@@ -95,7 +126,7 @@ struct AppListView: View {
                                 .lineLimit(1)
                                 .truncationMode(.tail)
                         }
-                        .help(app.appName)
+                        .help(app.path.path)
                     }
                     .width(min: 170, ideal: 210, max: 240)
 
@@ -106,7 +137,7 @@ struct AppListView: View {
                     }
                     .width(min: 64, ideal: 72, max: 82)
                 }
-                .disabled(appState.isRemovingAppFiles)
+                .disabled(appState.isRemovingAppFiles || appState.isOpeningAppUninstaller)
                 .onChange(of: selection) { newValue in
                     guard let id = newValue,
                           let app = appState.installedApps.first(where: { $0.id == id })
@@ -140,6 +171,7 @@ struct AppListView: View {
     private var fileDetail: some View {
         if let app = appState.selectedApp {
             AppFilesView(app: app)
+                .id(app.id)
         } else {
             EmptyStateView(
                 "Select an App",
@@ -148,5 +180,66 @@ struct AppListView: View {
                 tint: Tint.purple
             )
         }
+    }
+}
+
+private struct AppRemovalSummary: View {
+    let report: AppRemovalReport
+    let onReveal: ([URL]) -> Void
+    let onRequestAccess: () -> Void
+    let onDismiss: () -> Void
+    @State private var showDetails = false
+
+    private var summary: String {
+        String(
+            format: String(localized: "%lld moved to Trash, %lld already absent, %lld remaining"),
+            Int64(report.result.moved.count), Int64(report.result.missing.count), Int64(report.result.failures.count)
+        )
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(report.app.appName).font(.headline)
+                    Text(summary).foregroundStyle(.secondary)
+                }
+
+                Spacer()
+
+                if report.needsFullDiskAccess {
+                    Button("Review Full Disk Access", action: onRequestAccess)
+                }
+                let revealable = report.result.failures.filter { $0.reason.canRevealInFinder }
+                if !revealable.isEmpty {
+                    Button("Reveal in Finder") { onReveal(revealable.map(\.target.url)) }
+                }
+                Button("Done", action: onDismiss)
+            }
+
+            if !report.result.failures.isEmpty {
+                DisclosureGroup("Items still on disk", isExpanded: $showDetails) {
+                    ScrollView {
+                        LazyVStack(alignment: .leading, spacing: 8) {
+                            ForEach(report.result.failures) { failure in
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(failure.target.url.path)
+                                        .textSelection(.enabled)
+                                    Text(failure.reason.message)
+                                        .foregroundStyle(.secondary)
+                                }
+                            }
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.vertical, 6)
+                    }
+                    .frame(maxHeight: 120)
+                }
+            }
+        }
+        .font(.callout)
+        .controlSize(.small)
+        .padding(12)
+        .background(.bar)
     }
 }

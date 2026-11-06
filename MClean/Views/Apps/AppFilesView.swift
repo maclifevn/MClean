@@ -67,8 +67,39 @@ struct AppFilesView: View {
     @State private var groupSizeCache: [LeftoverGroup: Int64] = [:]
     @State private var showBulkRemovalConfirmation = false
     @State private var pendingRemovalURLs: Set<URL> = []
+    @State private var bundledUninstaller: URL?
+    @State private var checkedForUninstaller = false
+    @State private var reviewManualRemoval = false
+    @State private var showHomebrewConfirmation = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @AppStorage("settings.general.confirmBeforeDelete") private var confirmBeforeDelete = true
+
+    private var usesAdobeUninstaller: Bool { AdobeUninstaller.supports(app.bundleIdentifier) }
+    private var vendorUninstaller: URL? {
+        if case .homebrew = appState.appInstallSource { return nil }
+        return bundledUninstaller
+    }
+    private var offersVendorUninstaller: Bool { usesAdobeUninstaller || vendorUninstaller != nil }
+    private var canRemoveFiles: Bool {
+        appState.appInstallSource == .standalone && canReviewManualRemoval
+    }
+
+    private var canReviewManualRemoval: Bool {
+        (usesAdobeUninstaller || checkedForUninstaller) && (!offersVendorUninstaller || reviewManualRemoval)
+    }
+
+    private var allowsManualReview: Bool {
+        switch appState.appInstallSource {
+        case .standalone: return true
+        case .installerPackage(let package): return package.canMoveBundle
+        default: return false
+        }
+    }
+
+    private var displayedFiles: [URL] {
+        if appState.appInstallSource == .standalone { return appState.discoveredFiles }
+        return appState.discoveredFiles.filter { $0.path == app.path.path }
+    }
 
     private var totalSelectedSize: Int64 {
         appState.selectedFiles.reduce(Int64(0)) { total, url in
@@ -79,13 +110,15 @@ struct AppFilesView: View {
     var body: some View {
         VStack(spacing: 0) {
             header
+            uninstallActions
+            installationDetails
 
             Divider()
 
             // Content
             if appState.isScanningAppFiles {
                 scanningState
-            } else if appState.discoveredFiles.isEmpty {
+            } else if displayedFiles.isEmpty {
                 EmptyStateView(
                     "No Related Files",
                     systemImage: "checkmark.circle",
@@ -95,13 +128,23 @@ struct AppFilesView: View {
                     tint: Tint.green
                 )
             } else {
-                fileGroupsList
+                fileGroupsList.disabled(appState.isRemovingAppFiles)
 
-                actionBar
+                if canRemoveFiles { actionBar }
             }
         }
-        .task(id: appState.discoveredFiles) {
-            let urls = appState.discoveredFiles
+        .task(id: app.id) {
+            guard !usesAdobeUninstaller else { return }
+            let path = app.path
+            let url = await Task.detached(priority: .utility) {
+                AppUninstaller.bundledUninstaller(for: path)
+            }.value
+            guard !Task.isCancelled else { return }
+            bundledUninstaller = url
+            checkedForUninstaller = true
+        }
+        .task(id: displayedFiles) {
+            let urls = displayedFiles
             let buckets = Dictionary(grouping: urls, by: LeftoverGroup.categorize)
             groupedFiles = LeftoverGroup.allCases.compactMap { group in
                 guard let grouped = buckets[group], !grouped.isEmpty else { return nil }
@@ -110,11 +153,13 @@ struct AppFilesView: View {
             sizeCache = [:]
             groupSizeCache = [:]
 
+            let bundlePath = app.path.path
+            let bundleSize = app.size
             let worker = Task.detached(priority: .utility) { () -> [URL: Int64] in
                 var cache: [URL: Int64] = [:]
                 for url in urls {
                     guard !Task.isCancelled else { break }
-                    cache[url] = FileSizeCalculator.size(of: url) ?? 0
+                    cache[url] = url.path == bundlePath ? bundleSize : FileSizeCalculator.size(of: url) ?? 0
                 }
                 return cache
             }
@@ -123,20 +168,11 @@ struct AppFilesView: View {
             } onCancel: {
                 worker.cancel()
             }
-            guard !Task.isCancelled, appState.discoveredFiles == urls else { return }
+            guard !Task.isCancelled, displayedFiles == urls else { return }
             sizeCache = sizes
             groupSizeCache = Dictionary(uniqueKeysWithValues: groupedFiles.map { entry in
                 (entry.group, entry.urls.reduce(0) { $0 + (sizes[$1] ?? 0) })
             })
-        }
-        .onChange(of: appState.removalNeedsFullDiskAccess) { needs in
-            // FDA-fixable removals jump straight into the rich sheet, the
-            // same flow cleanup uses. The user grants permission once and we
-            // re-fire the failed batch — using the frozen snapshot from
-            // AppState so a mid-sheet selection change or app switch doesn't
-            // re-trash the wrong files.
-            guard needs else { return }
-            appState.requestFullDiskAccessAndRetryUninstall(appName: app.appName)
         }
         .onChange(of: showBulkRemovalConfirmation) { appState.showCleanConfirmation = $0 }
         .onDisappear { appState.showCleanConfirmation = false }
@@ -146,28 +182,12 @@ struct AppFilesView: View {
             titleVisibility: .visible
         ) {
             Button("Move to Trash", role: .destructive) {
-                appState.removeSelectedFiles(confirmedURLs: pendingRemovalURLs)
+                appState.removeSelectedFiles(for: app, confirmedURLs: pendingRemovalURLs)
                 pendingRemovalURLs = []
             }
             Button("Cancel", role: .cancel) {}
         } message: {
             Text("Items can be restored from the Trash.")
-        }
-        .alert("Removal Failed", isPresented: Binding(
-            get: { appState.removalError != nil && !appState.removalNeedsFullDiskAccess },
-            set: {
-                if !$0 {
-                    appState.removalError = nil
-                    appState.removalNeedsFullDiskAccess = false
-                }
-            }
-        )) {
-            Button("OK", role: .cancel) {
-                appState.removalError = nil
-                appState.removalNeedsFullDiskAccess = false
-            }
-        } message: {
-            Text(appState.removalError ?? "")
         }
     }
 
@@ -185,14 +205,22 @@ struct AppFilesView: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text(app.appName)
                     .font(.title3.bold())
-                Text(app.bundleIdentifier)
+                if let version = app.version {
+                    Text(String(format: String(localized: "Version %@"), version))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                Text(app.path.path)
                     .font(.caption)
                     .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+                    .help(app.path.path)
             }
 
             Spacer()
 
-            if !appState.discoveredFiles.isEmpty {
+            if canRemoveFiles && !appState.discoveredFiles.isEmpty {
                 VStack(alignment: .trailing, spacing: 2) {
                     Text(filesCountText(count: appState.discoveredFiles.count))
                         .font(.callout)
@@ -207,6 +235,132 @@ struct AppFilesView: View {
             }
         }
         .padding()
+    }
+
+    private var uninstallActions: some View {
+        HStack {
+            if usesAdobeUninstaller {
+                Button {
+                    Task { await appState.openAdobeUninstaller(for: app) }
+                } label: {
+                    Label("Uninstall with Adobe", systemImage: "arrow.up.forward.app")
+                }
+                .buttonStyle(.borderedProminent)
+
+                if appState.isOpeningAppUninstaller {
+                    ProgressView().controlSize(.small)
+                }
+            } else if let vendorUninstaller {
+                Button {
+                    appState.revealForUninstall([vendorUninstaller], app: app)
+                } label: {
+                    Label("Reveal Vendor Uninstaller", systemImage: "arrow.up.forward.app")
+                }
+                .buttonStyle(.borderedProminent)
+            }
+
+            if offersVendorUninstaller && allowsManualReview && !reviewManualRemoval {
+                Button("Review Manual Removal") { reviewManualRemoval = true }
+            }
+
+            Spacer()
+
+            Button {
+                appState.revealForUninstall([app.path], app: app)
+            } label: {
+                Label("Reveal in Finder", systemImage: "folder")
+                    .labelStyle(.iconOnly)
+            }
+            .help("Reveal in Finder")
+        }
+        .controlSize(.small)
+        .disabled(appState.isRemovingAppFiles || appState.isOpeningAppUninstaller)
+        .padding(.horizontal)
+        .padding(.bottom, 10)
+    }
+
+    @ViewBuilder
+    private var installationDetails: some View {
+        Group {
+            switch appState.appInstallSource {
+            case .none:
+                HStack(spacing: 8) {
+                    ProgressView().controlSize(.small)
+                    Text("Checking how this app was installed…").foregroundStyle(.secondary)
+                }
+            case .standalone:
+                EmptyView()
+            case .homebrew(let cask):
+                VStack(alignment: .leading, spacing: 8) {
+                    Label("Installed with Homebrew", systemImage: "shippingbox")
+                        .font(.headline)
+                    Text("\(cask.token) · \(cask.version)").foregroundStyle(.secondary)
+                    if !cask.canRunInMClean {
+                        Text("Review this cask’s uninstall command in Terminal. Its recipe may affect other components.")
+                            .foregroundStyle(.secondary)
+                        if !cask.otherManagedPaths.isEmpty {
+                            Text(cask.otherManagedPaths.joined(separator: "\n"))
+                                .lineLimit(3)
+                                .font(.caption)
+                                .textSelection(.enabled)
+                                .foregroundStyle(.secondary)
+                        }
+                        Text(cask.terminalCommand)
+                            .font(.caption.monospaced())
+                            .textSelection(.enabled)
+                    }
+                    HStack {
+                        if cask.canRunInMClean {
+                            Button("Uninstall with Homebrew", role: .destructive) { showHomebrewConfirmation = true }
+                                .buttonStyle(.borderedProminent)
+                                .confirmationDialog("Uninstall with Homebrew?", isPresented: $showHomebrewConfirmation,
+                                                    titleVisibility: .visible) {
+                                    Button("Uninstall with Homebrew", role: .destructive) {
+                                        Task { await appState.uninstallHomebrewCask(cask, for: app) }
+                                    }
+                                    Button("Cancel", role: .cancel) {}
+                                } message: {
+                                    Text("Homebrew will uninstall this cask using its standard removal command.")
+                                }
+                        }
+                        Button("Copy Terminal Command") {
+                            Task { await appState.copyHomebrewUninstallCommand(cask, for: app) }
+                        }
+                    }
+                }
+            case .installerPackage(let package):
+                VStack(alignment: .leading, spacing: 8) {
+                    Label("Installed from a package", systemImage: "shippingbox")
+                        .font(.headline)
+                    Text(package.receipts.map { "\($0.id) · \($0.version)" }.joined(separator: "\n"))
+                        .lineLimit(3)
+                        .textSelection(.enabled)
+                        .foregroundStyle(.secondary)
+                    if package.canMoveBundle {
+                        Text("Manual removal moves only this application bundle to the Trash.")
+                            .foregroundStyle(.secondary)
+                        if canReviewManualRemoval {
+                            Button("Move App to Trash", role: .destructive) {
+                                pendingRemovalURLs = [app.path]
+                                showBulkRemovalConfirmation = true
+                            }
+                        }
+                    } else {
+                        Text("Use the developer’s uninstaller for this package and its components.")
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            case .unverified:
+                Text("The installation source could not be verified. Review this app in Finder.")
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .controlSize(.small)
+        .font(.callout)
+        .disabled(appState.isRemovingAppFiles || appState.isOpeningAppUninstaller)
+        .padding(.horizontal)
+        .padding(.bottom, appState.appInstallSource == .standalone ? 0 : 10)
     }
 
     // MARK: - Scanning state
@@ -243,9 +397,11 @@ struct AppFilesView: View {
                     ForEach(entry.urls, id: \.self) { fileURL in
                         FileRow(
                             fileURL: fileURL,
-                            isSelected: fileSelectionBinding(for: fileURL),
+                            isSelected: canRemoveFiles ? fileSelectionBinding(for: fileURL) : nil,
                             fileSize: cachedSize(fileURL),
-                            onRemove: { removeSingleFile(fileURL) }
+                            onRemove: canRemoveFiles ? {
+                                appState.removeSelectedFiles(for: app, confirmedURLs: [fileURL])
+                            } : nil
                         )
                         .transition(
                             reduceMotion
@@ -269,20 +425,22 @@ struct AppFilesView: View {
         let allSelected = urls.allSatisfy { appState.selectedFiles.contains($0) }
 
         return HStack(spacing: 10) {
-            Toggle(isOn: Binding(
-                get: { allSelected },
-                set: { selected in
-                    if selected {
-                        appState.selectedFiles.formUnion(urls)
-                    } else {
-                        appState.selectedFiles.subtract(urls)
+            if canRemoveFiles {
+                Toggle(isOn: Binding(
+                    get: { allSelected },
+                    set: { selected in
+                        if selected {
+                            appState.selectedFiles.formUnion(urls)
+                        } else {
+                            appState.selectedFiles.subtract(urls)
+                        }
                     }
+                )) {
+                    Text(LocalizedStringKey(group.rawValue))
                 }
-            )) {
-                EmptyView()
+                .toggleStyle(AnimatedCheckboxStyle())
+                .labelsHidden()
             }
-            .toggleStyle(AnimatedCheckboxStyle())
-            .labelsHidden()
 
             IconTile(systemName: group.icon, tint: group.tint, size: 22, corner: 6)
             Text(LocalizedStringKey(group.rawValue))
@@ -342,7 +500,7 @@ struct AppFilesView: View {
                         pendingRemovalURLs = appState.selectedFiles
                         showBulkRemovalConfirmation = true
                     } else {
-                        appState.removeSelectedFiles()
+                        appState.removeSelectedFiles(for: app, confirmedURLs: appState.selectedFiles)
                     }
                 } label: {
                     Text(removeFilesLabel)
@@ -397,12 +555,6 @@ struct AppFilesView: View {
         sizeCache[url]
     }
 
-    private func removeSingleFile(_ url: URL) {
-        let previousSelection = appState.selectedFiles
-        appState.selectedFiles = [url]
-        appState.removeSelectedFiles()
-        appState.selectedFiles = previousSelection
-    }
 }
 
 /// Magnifier over expanding sonar rings — the "actively searching" beat for
@@ -441,9 +593,9 @@ private struct SearchPulse: View {
 
 struct FileRow: View {
     let fileURL: URL
-    @Binding var isSelected: Bool
+    let isSelected: Binding<Bool>?
     let fileSize: Int64?
-    let onRemove: () -> Void
+    let onRemove: (() -> Void)?
 
     @State private var isHovering = false
     @State private var showConfirmation = false
@@ -451,45 +603,76 @@ struct FileRow: View {
     @AppStorage("settings.general.confirmBeforeDelete") private var confirmBeforeDelete = true
 
     var body: some View {
-        Toggle(isOn: $isSelected) {
-            HStack {
-                Image(nsImage: FileIconCache.icon(forPath: fileURL.path))
-                    .resizable()
-                    .frame(width: 16, height: 16)
+        Group {
+            if let isSelected {
+                Toggle(isOn: isSelected) { rowContents }
+                    .toggleStyle(AnimatedCheckboxStyle())
+            } else {
+                rowContents
+            }
+        }
+        .padding(.vertical, 2)
+        .padding(.horizontal, 4)
+        .background(
+            RoundedRectangle(cornerRadius: 6)
+                .fill(isHovering ? Color.primary.opacity(0.06) : Color.clear)
+        )
+        .scaleEffect(isHovering && !reduceMotion ? 1.01 : 1)
+        .animation(reduceMotion ? nil : MotionTokens.snappy, value: isHovering)
+        .onHover { isHovering = $0 }
+        .contextMenu {
+            Button("Reveal in Finder") { NSWorkspace.shared.activateFileViewerSelecting([fileURL]) }
+            if let onRemove {
+                Button("Move to Trash", role: .destructive) { requestRemoval(onRemove) }
+            }
+        }
+        .alert(
+            Text(String(format: String(localized: "Remove %@?"), fileURL.lastPathComponent)),
+            isPresented: $showConfirmation
+        ) {
+            Button("Cancel", role: .cancel) {}
+            Button("Remove", role: .destructive) { onRemove?() }
+        } message: {
+            Text("This item will be moved to the Trash and can be restored.")
+        }
+    }
 
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(fileURL.lastPathComponent)
-                        .lineLimit(1)
-                    Text(fileURL.path)
-                        .font(.caption)
-                        .foregroundStyle(.tertiary)
-                        .lineLimit(1)
-                        .truncationMode(.middle)
-                }
+    private var rowContents: some View {
+        HStack {
+            Image(nsImage: FileIconCache.icon(forPath: fileURL.path))
+                .resizable()
+                .frame(width: 16, height: 16)
 
-                Spacer()
+            VStack(alignment: .leading, spacing: 2) {
+                Text(fileURL.lastPathComponent)
+                    .lineLimit(1)
+                Text(fileURL.path)
+                    .font(.caption)
+                    .foregroundStyle(.tertiary)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+            }
 
-                // Buttons stay in the layout permanently and fade with
-                // hover, so the trailing size badge never jumps sideways.
+            Spacer()
+
+            // Buttons stay in the layout permanently and fade with
+            // hover, so the trailing size badge never jumps sideways.
+            Button {
+                NSWorkspace.shared.activateFileViewerSelecting([fileURL])
+            } label: {
+                Image(systemName: "folder")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            .buttonStyle(.plain)
+            .help("Reveal in Finder")
+            .opacity(isHovering ? 1 : 0)
+            .scaleEffect(reduceMotion ? 1 : (isHovering ? 1 : 0.8))
+            .allowsHitTesting(isHovering)
+
+            if let onRemove {
                 Button {
-                    NSWorkspace.shared.selectFile(fileURL.path, inFileViewerRootedAtPath: "")
-                } label: {
-                    Image(systemName: "folder")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-                .buttonStyle(.plain)
-                .help("Reveal in Finder")
-                .opacity(isHovering ? 1 : 0)
-                .scaleEffect(reduceMotion ? 1 : (isHovering ? 1 : 0.8))
-                .allowsHitTesting(isHovering)
-
-                Button {
-                    if confirmBeforeDelete {
-                        showConfirmation = true
-                    } else {
-                        onRemove()
-                    }
+                    requestRemoval(onRemove)
                 } label: {
                     Image(systemName: "trash")
                         .font(.caption)
@@ -500,34 +683,17 @@ struct FileRow: View {
                 .opacity(isHovering ? 1 : 0)
                 .scaleEffect(reduceMotion ? 1 : (isHovering ? 1 : 0.8))
                 .allowsHitTesting(isHovering)
+            }
 
-                if let size = fileSize {
-                    Text(ByteCountFormatter.string(fromByteCount: size, countStyle: .file))
-                        .monospacedDigit()
-                        .foregroundStyle(.secondary)
-                }
+            if let size = fileSize {
+                Text(ByteCountFormatter.string(fromByteCount: size, countStyle: .file))
+                    .monospacedDigit()
+                    .foregroundStyle(.secondary)
             }
         }
-        .toggleStyle(AnimatedCheckboxStyle())
-        .padding(.vertical, 2)
-        .padding(.horizontal, 4)
-        .background(
-            RoundedRectangle(cornerRadius: 6)
-                .fill(isHovering ? Color.primary.opacity(0.06) : Color.clear)
-        )
-        .scaleEffect(isHovering && !reduceMotion ? 1.01 : 1)
-        .animation(reduceMotion ? nil : MotionTokens.snappy, value: isHovering)
-        .onHover { isHovering = $0 }
-        .alert(
-            Text(
-                String(format: String(localized: "Remove %@?"), fileURL.lastPathComponent)
-            ),
-            isPresented: $showConfirmation
-        ) {
-            Button("Cancel", role: .cancel) {}
-            Button("Remove", role: .destructive) { onRemove() }
-        } message: {
-            Text("This item will be moved to the Trash and can be restored.")
-        }
+    }
+
+    private func requestRemoval(_ remove: () -> Void) {
+        if confirmBeforeDelete { showConfirmation = true } else { remove() }
     }
 }

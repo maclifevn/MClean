@@ -410,7 +410,7 @@ actor CleaningEngine {
         return false
     }
 
-    private static func isPermissionDenied(_ error: Error) -> Bool {
+    static func isPermissionDenied(_ error: Error) -> Bool {
         let nsError = error as NSError
         if (nsError.domain == NSCocoaErrorDomain &&
             (nsError.code == NSFileReadNoPermissionError || nsError.code == NSFileWriteNoPermissionError)) ||

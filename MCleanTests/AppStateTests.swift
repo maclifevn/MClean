@@ -79,7 +79,8 @@ final class AppStateTests: XCTestCase {
             }
         )
 
-        appState.scanForAppFiles(makeApp())
+        let app = makeApp()
+        appState.scanForAppFiles(app)
 
         XCTAssertTrue(appState.isScanningAppFiles)
         XCTAssertTrue(appState.discoveredFiles.isEmpty)
@@ -88,7 +89,8 @@ final class AppStateTests: XCTestCase {
         let pendingCompletion = try XCTUnwrap(completion)
         let urls: Set<URL> = [
             URL(fileURLWithPath: "/tmp/B"),
-            URL(fileURLWithPath: "/tmp/A")
+            URL(fileURLWithPath: "/tmp/A"),
+            app.path,
         ]
 
         pendingCompletion(urls)
@@ -98,7 +100,7 @@ final class AppStateTests: XCTestCase {
             appState.discoveredFiles,
             urls.sorted { $0.path < $1.path }
         )
-        XCTAssertEqual(appState.selectedFiles, urls)
+        XCTAssertEqual(appState.selectedFiles, [app.path])
         XCTAssertEqual(appState.currentAppFileSearchLocationCount, urls.count)
     }
 
@@ -116,20 +118,20 @@ final class AppStateTests: XCTestCase {
         let firstApp = makeApp(name: "First", path: "/Applications/First.app")
         let secondApp = makeApp(name: "Second", path: "/Applications/Second.app")
         let firstResult = Set([URL(fileURLWithPath: "/tmp/first-cache")])
-        let secondResult = Set([URL(fileURLWithPath: "/tmp/second-cache")])
+        let secondResult = Set([URL(fileURLWithPath: "/tmp/second-cache"), secondApp.path])
 
         appState.scanForAppFiles(firstApp)
         appState.scanForAppFiles(secondApp)
         XCTAssertEqual(cancelledApps, ["First"])
 
         try XCTUnwrap(completions["Second"])(secondResult)
-        XCTAssertEqual(appState.discoveredFiles, Array(secondResult))
-        XCTAssertEqual(appState.selectedFiles, secondResult)
+        XCTAssertEqual(Set(appState.discoveredFiles), secondResult)
+        XCTAssertEqual(appState.selectedFiles, [secondApp.path])
         XCTAssertFalse(appState.isScanningAppFiles)
 
         try XCTUnwrap(completions["First"])(firstResult)
-        XCTAssertEqual(appState.discoveredFiles, Array(secondResult))
-        XCTAssertEqual(appState.selectedFiles, secondResult)
+        XCTAssertEqual(Set(appState.discoveredFiles), secondResult)
+        XCTAssertEqual(appState.selectedFiles, [secondApp.path])
         XCTAssertFalse(appState.isScanningAppFiles)
     }
 
@@ -413,12 +415,12 @@ final class AppStateTests: XCTestCase {
         path: String = "/Applications/MClean.app"
     ) -> InstalledApp {
         InstalledApp(
-            id: UUID(),
             appName: name,
             bundleIdentifier: "com.maclife.mclean",
             path: URL(fileURLWithPath: path),
             icon: NSImage(size: NSSize(width: 32, height: 32)),
-            size: 1
+            size: 1,
+            version: nil
         )
     }
 }

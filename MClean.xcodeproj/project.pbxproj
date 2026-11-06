@@ -21,9 +21,11 @@
 		17D83F074AC55298954753FE /* Conditions.swift in Sources */ = {isa = PBXBuildFile; fileRef = F39CA2E63592F2CD4657561C /* Conditions.swift */; };
 		19A09419C92C32458B76E456 /* StringNormalization.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3084FB26EEA344D0CE85A743 /* StringNormalization.swift */; };
 		1C1A6A6842A0FA4AD3D02762 /* DuplicateFinder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 07CC2C3D86974853B057D505 /* DuplicateFinder.swift */; };
+		1CB527FB425BDAE811F846E0 /* AppUninstallerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A7E615CA9D647D0985407551 /* AppUninstallerTests.swift */; };
 		1EAD42100EA58ABBF2BDDA82 /* BubbleLayout.swift in Sources */ = {isa = PBXBuildFile; fileRef = 905E7C78F1DC41506FEEDFEA /* BubbleLayout.swift */; };
 		1FD87598B1C74C8FF770281A /* SpaceLensNode.swift in Sources */ = {isa = PBXBuildFile; fileRef = 801EDA37CC70B783B039BA3D /* SpaceLensNode.swift */; };
 		2093DC2B7FECA79C69901D98 /* ProcessResourceMonitorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = EB851EBFEF94BA4B805ABBD8 /* ProcessResourceMonitorTests.swift */; };
+		21AECC2CF672031CA1D52CD7 /* PackageUninstaller.swift in Sources */ = {isa = PBXBuildFile; fileRef = A889BE3E322F768B5ED7D8AB /* PackageUninstaller.swift */; };
 		222B1EE6716ECA8971214641 /* ServicesMenu.strings in Resources */ = {isa = PBXBuildFile; fileRef = 2C9A67A18BBEA90310AB79DF /* ServicesMenu.strings */; };
 		29ADED029C679C21BE99A559 /* CLI.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7F03CCABE0BB4A5B1D3316A3 /* CLI.swift */; };
 		2A6C6946A0B2637073DC38FE /* DuplicateFinderTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1998345FFB1B461CF30CF675 /* DuplicateFinderTests.swift */; };
@@ -89,10 +91,12 @@
 		A79F5F68E097FDE73A01371D /* ProtectionAudit.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0658E76A6F2D5955A1E102CA /* ProtectionAudit.swift */; };
 		A96907176DA979DE52C7BB8C /* ServicesMenu.strings in Resources */ = {isa = PBXBuildFile; fileRef = FCD7AD0953BE09DC1375CBF4 /* ServicesMenu.strings */; };
 		AC4048C1467FFF80DF4DD1D2 /* ServicesMenu.strings in Resources */ = {isa = PBXBuildFile; fileRef = DDC2667E94290EBA853C0AA8 /* ServicesMenu.strings */; };
+		B06F3A39F8DD1D722066DE3F /* AdobeUninstaller.swift in Sources */ = {isa = PBXBuildFile; fileRef = E2201FE291AF91DFE6EB32BE /* AdobeUninstaller.swift */; };
 		B0D0BE40652A6EC97F0202E4 /* PermissionSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = E0E0881794F0AFEDCDE27DDB /* PermissionSheet.swift */; };
 		B2467640DF21C8EB19C31B7A /* OrphanSafetyPolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = B44C97DE61F384636B15968B /* OrphanSafetyPolicy.swift */; };
 		B74D2C44E393F85A1393E4D1 /* CleaningEngineTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 30EAA9C935FB1BB8AF849E66 /* CleaningEngineTests.swift */; };
 		B825BF0B405E02C30C544E14 /* ServicesMenu.strings in Resources */ = {isa = PBXBuildFile; fileRef = CBDD2BC3ACFC31B93BB3D20F /* ServicesMenu.strings */; };
+		B8B6CB1CAE80537252500C9D /* AppUninstaller.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE31E193A7E872DB075C5DA4 /* AppUninstaller.swift */; };
 		BB5C167FFECE717781786819 /* InfoPlist.strings in Resources */ = {isa = PBXBuildFile; fileRef = 70EFFCD45AF60A9030CC5E7C /* InfoPlist.strings */; };
 		C0A84D01175B79BE70129287 /* DuplicateFinderView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8A6E4948C93F0431766D41A4 /* DuplicateFinderView.swift */; };
 		C1D02640E402D78D65BC22E2 /* OrphanListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B8D0E343F28D37959A3F1EC /* OrphanListView.swift */; };
@@ -106,6 +110,7 @@
 		D7C425AE2B0B794F107D13FD /* FileIconCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = B9EA57034381410CF6D0D57E /* FileIconCache.swift */; };
 		D993F7943403FDFD6BB7FCBE /* ProviderPaths.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6D751B74ECBD38B7B43D6C91 /* ProviderPaths.swift */; };
 		DB1CFE7E9543413C0E396B6F /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E04F8C2AA99980272A93499 /* Theme.swift */; };
+		DEEFC04AD7310DF32004DD73 /* ManagedUninstallerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 219C8BC8FED028AEFC96FAE5 /* ManagedUninstallerTests.swift */; };
 		DF520623F3DB809727560120 /* SimilarPhotoFinder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2E3DD380645D0466A7738B2F /* SimilarPhotoFinder.swift */; };
 		DFF2EE4DE7E8D3FCEBE90DCF /* AppBundleDragHandle.swift in Sources */ = {isa = PBXBuildFile; fileRef = 48B6836FCAA164A9808475BD /* AppBundleDragHandle.swift */; };
 		E75C19B444C68A75C0D5F866 /* DashboardCharts.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3F936D4AA8D3631F07ADEB67 /* DashboardCharts.swift */; };
@@ -115,6 +120,7 @@
 		F11A25100FA2855DC926F90E /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 97D6F203838B71F1F1DFB512 /* SettingsView.swift */; };
 		F260D6E5E0E2981511C68B9B /* AppPathFinder.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA92771BDF08868772B39E1D /* AppPathFinder.swift */; };
 		F66783E5832D04AE954CD572 /* SchedulerService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 068CFAC1CC482B3C9177DCC8 /* SchedulerService.swift */; };
+		F80AFFBB01EC6B6B00B11E89 /* HomebrewUninstaller.swift in Sources */ = {isa = PBXBuildFile; fileRef = 402F1A30D907E98F7E86DA6A /* HomebrewUninstaller.swift */; };
 		F8BF98166894FE2EB5CDFF78 /* SimulatorRuntimeSupportTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5123897227E74D68ABB30836 /* SimulatorRuntimeSupportTests.swift */; };
 		FC976CDB8A9FA46062FA4CB9 /* BubbleLayoutTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7EF1D544F58416B32109C66C /* BubbleLayoutTests.swift */; };
 		FE8958996E02D6D5EB48273B /* DashboardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DFF7F2CDCBF5758A9AB363A5 /* DashboardView.swift */; };
@@ -149,6 +155,7 @@
 		2007BD50D76B81D47122C7AE /* CLIArgumentTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CLIArgumentTests.swift; sourceTree = "<group>"; };
 		20C29CA7FD3ACF1E9DDD9A10 /* AppFilesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppFilesView.swift; sourceTree = "<group>"; };
 		2164AB3A919598EE9BA0370D /* EmptyStateView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EmptyStateView.swift; sourceTree = "<group>"; };
+		219C8BC8FED028AEFC96FAE5 /* ManagedUninstallerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ManagedUninstallerTests.swift; sourceTree = "<group>"; };
 		24853035079F80F17D2881F0 /* SpaceLensBreadcrumbTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpaceLensBreadcrumbTests.swift; sourceTree = "<group>"; };
 		26D4255A43D01E68063D85D4 /* AppUpdatesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppUpdatesView.swift; sourceTree = "<group>"; };
 		27792958680204C64397C05C /* ja */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = ja; path = ja.lproj/Localizable.strings; sourceTree = "<group>"; };
@@ -168,6 +175,7 @@
 		3C9886AD870738FAC7FADDA2 /* MClean.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = MClean.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		3F913F60813ADCA375392704 /* CleanupExclusions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CleanupExclusions.swift; sourceTree = "<group>"; };
 		3F936D4AA8D3631F07ADEB67 /* DashboardCharts.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardCharts.swift; sourceTree = "<group>"; };
+		402F1A30D907E98F7E86DA6A /* HomebrewUninstaller.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomebrewUninstaller.swift; sourceTree = "<group>"; };
 		419D1269B8DEE9151B440726 /* ApplicationUpdaterTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ApplicationUpdaterTests.swift; sourceTree = "<group>"; };
 		438354CEAB322F63EE62F3D1 /* CategoryDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CategoryDetailView.swift; sourceTree = "<group>"; };
 		439AC3289EEDE13563B9A5D4 /* CleaningEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CleaningEngine.swift; sourceTree = "<group>"; };
@@ -217,6 +225,8 @@
 		A29BE64738CB514205CAF8E7 /* SpaceLensStorageTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpaceLensStorageTests.swift; sourceTree = "<group>"; };
 		A44A58EE739B763263023659 /* es */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = es; path = es.lproj/Localizable.strings; sourceTree = "<group>"; };
 		A5F57650CB060105464F79D5 /* AppStateTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppStateTests.swift; sourceTree = "<group>"; };
+		A7E615CA9D647D0985407551 /* AppUninstallerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppUninstallerTests.swift; sourceTree = "<group>"; };
+		A889BE3E322F768B5ED7D8AB /* PackageUninstaller.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PackageUninstaller.swift; sourceTree = "<group>"; };
 		AB3D5B22ADDE070347229076 /* ThemeManagerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ThemeManagerTests.swift; sourceTree = "<group>"; };
 		AD994C5721866165CBFD8ACC /* MCleanApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MCleanApp.swift; sourceTree = "<group>"; };
 		AFEC32FCF92AE535B87FD892 /* PerformanceView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PerformanceView.swift; sourceTree = "<group>"; };
@@ -248,9 +258,11 @@
 		DFF7F2CDCBF5758A9AB363A5 /* DashboardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardView.swift; sourceTree = "<group>"; };
 		E0E0881794F0AFEDCDE27DDB /* PermissionSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PermissionSheet.swift; sourceTree = "<group>"; };
 		E1A6C26A7CC81320EDD6E27F /* AppUpdateSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppUpdateSettingsView.swift; sourceTree = "<group>"; };
+		E2201FE291AF91DFE6EB32BE /* AdobeUninstaller.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AdobeUninstaller.swift; sourceTree = "<group>"; };
 		E4D22C9157F4B22666F84A46 /* ProtectionView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProtectionView.swift; sourceTree = "<group>"; };
 		EB2CA02B93B95B163B0760E0 /* pt-BR */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = "pt-BR"; path = "pt-BR.lproj/Localizable.strings"; sourceTree = "<group>"; };
 		EB851EBFEF94BA4B805ABBD8 /* ProcessResourceMonitorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProcessResourceMonitorTests.swift; sourceTree = "<group>"; };
+		EE31E193A7E872DB075C5DA4 /* AppUninstaller.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppUninstaller.swift; sourceTree = "<group>"; };
 		F1E2030F64C8A8914C12CAD6 /* BubbleMapView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BubbleMapView.swift; sourceTree = "<group>"; };
 		F215C1E6F89BAF93AF127F25 /* AppInfoFetcher.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppInfoFetcher.swift; sourceTree = "<group>"; };
 		F29F8066081A3DBCFC5E274E /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
@@ -292,6 +304,7 @@
 				4D7D8AB941024E1E84FB7F76 /* AppLanguagePreferencesTests.swift */,
 				419D1269B8DEE9151B440726 /* ApplicationUpdaterTests.swift */,
 				A5F57650CB060105464F79D5 /* AppStateTests.swift */,
+				A7E615CA9D647D0985407551 /* AppUninstallerTests.swift */,
 				7EF1D544F58416B32109C66C /* BubbleLayoutTests.swift */,
 				30EAA9C935FB1BB8AF849E66 /* CleaningEngineTests.swift */,
 				334ADFFFFACBAAC7199A2F8D /* CleanupExclusionsTests.swift */,
@@ -300,6 +313,7 @@
 				1998345FFB1B461CF30CF675 /* DuplicateFinderTests.swift */,
 				B85AF10B2B6595A656A51EBA /* FileOperationTrackerTests.swift */,
 				1895E0A3E12D45735A89CF47 /* LocalizationFilesTests.swift */,
+				219C8BC8FED028AEFC96FAE5 /* ManagedUninstallerTests.swift */,
 				3A9CF828D1BA5254904CAA44 /* MonitoringLifecycleTests.swift */,
 				B318EC4097174079EA6CFFB5 /* NodeCachePathTests.swift */,
 				CB05A978931662397DB658F2 /* PerformanceInspectorTests.swift */,
@@ -470,14 +484,18 @@
 		A8358E24E229D6618E5E3D00 /* Services */ = {
 			isa = PBXGroup;
 			children = (
+				E2201FE291AF91DFE6EB32BE /* AdobeUninstaller.swift */,
 				D7A2AF39AF6070E533FBD390 /* ApplicationUpdater.swift */,
+				EE31E193A7E872DB075C5DA4 /* AppUninstaller.swift */,
 				439AC3289EEDE13563B9A5D4 /* CleaningEngine.swift */,
 				3F913F60813ADCA375392704 /* CleanupExclusions.swift */,
 				07CC2C3D86974853B057D505 /* DuplicateFinder.swift */,
 				4A0BD93A94C1C35C4859ECBD /* FileOperationTracker.swift */,
 				9350AF261841B74F4B98486D /* FullDiskAccessManager.swift */,
 				CD03A28405BBAAF945EE0CA7 /* Haptics.swift */,
+				402F1A30D907E98F7E86DA6A /* HomebrewUninstaller.swift */,
 				99D7BA7FFD95B6ED27EC91B1 /* MenuBarController.swift */,
+				A889BE3E322F768B5ED7D8AB /* PackageUninstaller.swift */,
 				1D0CBDE1552955FBA4511E6C /* PerformanceInspector.swift */,
 				14C4094C48868B4578469DCF /* PermissionCoordinator.swift */,
 				780A068DF681ED1E74DE1B08 /* ProcessResourceMonitor.swift */,
@@ -670,6 +688,7 @@
 			files = (
 				9CE281D11834C730F438E492 /* AppLanguagePreferencesTests.swift in Sources */,
 				3093D04C857025CACA9C1145 /* AppStateTests.swift in Sources */,
+				1CB527FB425BDAE811F846E0 /* AppUninstallerTests.swift in Sources */,
 				9757616EA982B86296DF47CF /* ApplicationUpdaterTests.swift in Sources */,
 				FC976CDB8A9FA46062FA4CB9 /* BubbleLayoutTests.swift in Sources */,
 				5F8EE3C6B58727D7EBBBA968 /* CLIArgumentTests.swift in Sources */,
@@ -679,6 +698,7 @@
 				2A6C6946A0B2637073DC38FE /* DuplicateFinderTests.swift in Sources */,
 				073C9F1849EFC9DD8882C39B /* FileOperationTrackerTests.swift in Sources */,
 				CC4F6CEA593AD95D35E32A42 /* LocalizationFilesTests.swift in Sources */,
+				DEEFC04AD7310DF32004DD73 /* ManagedUninstallerTests.swift in Sources */,
 				D213E6E62A80526A7CE4BA59 /* MonitoringLifecycleTests.swift in Sources */,
 				767321CBC3C0A5B1B50AF75A /* NodeCachePathTests.swift in Sources */,
 				5038F14B5C8C6F0095F7F06C /* PerformanceInspectorTests.swift in Sources */,
@@ -701,6 +721,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				B06F3A39F8DD1D722066DE3F /* AdobeUninstaller.swift in Sources */,
 				DFF2EE4DE7E8D3FCEBE90DCF /* AppBundleDragHandle.swift in Sources */,
 				63E0536B222EDB193687984C /* AppConstants.swift in Sources */,
 				12371A39B6196FF576641F2C /* AppFilesView.swift in Sources */,
@@ -710,6 +731,7 @@
 				F260D6E5E0E2981511C68B9B /* AppPathFinder.swift in Sources */,
 				D55786D55D50777ED2D1591D /* AppState.swift in Sources */,
 				649464E8FA4F0A0422833863 /* AppTheme.swift in Sources */,
+				B8B6CB1CAE80537252500C9D /* AppUninstaller.swift in Sources */,
 				7191B3946036BBD762695428 /* AppUpdateSettingsView.swift in Sources */,
 				E898BC660C4F5E36A2CC80B5 /* AppUpdatesView.swift in Sources */,
 				0F68165F5EC700BDA6917D46 /* AppearancePill.swift in Sources */,
@@ -735,6 +757,7 @@
 				0D3FDB7E3C5F57F98A0F997B /* FileSize.swift in Sources */,
 				10AA3CFC6B99132B98C6CF9E /* FullDiskAccessManager.swift in Sources */,
 				54868F1888CA33D1B3CE5971 /* Haptics.swift in Sources */,
+				F80AFFBB01EC6B6B00B11E89 /* HomebrewUninstaller.swift in Sources */,
 				6BE6DC030F0737C5653E933A /* Locations.swift in Sources */,
 				12F17594D9ED30639A93B38D /* Logger.swift in Sources */,
 				719D8325ACD92EDF4768428E /* MCleanApp.swift in Sources */,
@@ -745,6 +768,7 @@
 				610540958B8FF3B76FA4D310 /* OnboardingView.swift in Sources */,
 				C1D02640E402D78D65BC22E2 /* OrphanListView.swift in Sources */,
 				B2467640DF21C8EB19C31B7A /* OrphanSafetyPolicy.swift in Sources */,
+				21AECC2CF672031CA1D52CD7 /* PackageUninstaller.swift in Sources */,
 				D0F0AF34C2B5DBE2C6864F82 /* PerformanceInspector.swift in Sources */,
 				407A2074C038724EA8910001 /* PerformanceView.swift in Sources */,
 				2D477D2D35013C3FA86725E2 /* PermissionCoordinator.swift in Sources */,
@@ -903,7 +927,7 @@
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 7;
+				CURRENT_PROJECT_VERSION = 9;
 				DEAD_CODE_STRIPPING = YES;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				DEVELOPMENT_TEAM = CF5PGH3KGK;
@@ -920,7 +944,7 @@
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = MClean/Info.plist;
 				MACOSX_DEPLOYMENT_TARGET = 13.0;
-				MARKETING_VERSION = 1.0.6;
+				MARKETING_VERSION = 1.0.7;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = NO;
@@ -975,7 +999,7 @@
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 7;
+				CURRENT_PROJECT_VERSION = 9;
 				DEAD_CODE_STRIPPING = YES;
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				DEVELOPMENT_TEAM = CF5PGH3KGK;
@@ -998,7 +1022,7 @@
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = MClean/Info.plist;
 				MACOSX_DEPLOYMENT_TARGET = 13.0;
-				MARKETING_VERSION = 1.0.6;
+				MARKETING_VERSION = 1.0.7;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;

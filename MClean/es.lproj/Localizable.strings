@@ -371,7 +371,7 @@
 "Include Small Files" = "Include Small Files";
 "Includes %lld selected items hidden by filters." = "Includes %lld selected items hidden by filters.";
 "Includes company name, entitlements, and team identifier matching." = "Incluye coincidencias con nombre de empresa, autorizaciones e identificador de equipo.";
-"Includes company-name and broader bundle identifier matching." = "Includes company-name and broader bundle identifier matching.";
+"Matches publisher and product names separately." = "Matches publisher and product names separately.";
 "Includes partial name matching and bundle ID components." = "Incluye coincidencias parciales de nombre y componentes del ID de paquete.";
 "Incoming network connections are filtered." = "Incoming network connections are filtered.";
 "Inspect" = "Inspect";
@@ -942,3 +942,35 @@
 "Please wait for the current task to finish." = "Please wait for the current task to finish.";
 
 "This file is excluded or protected: %@" = "This file is excluded or protected: %@";
+
+/* App Uninstaller */
+"%lld moved to Trash, %lld already absent, %lld remaining" = "%lld moved to Trash, %lld already absent, %lld remaining";
+"A verified copy of Adobe Creative Cloud could not be found." = "A verified copy of Adobe Creative Cloud could not be found.";
+"Items still on disk" = "Items still on disk";
+"macOS denied permission to move this item." = "macOS denied permission to move this item.";
+"Protected from removal." = "Protected from removal.";
+"Quit %@ before uninstalling it." = "Quit %@ before uninstalling it.";
+"Reveal Vendor Uninstaller" = "Reveal Vendor Uninstaller";
+"This item changed after the scan." = "This item changed after the scan.";
+"This location may need Full Disk Access." = "This location may need Full Disk Access.";
+"Uninstall with Adobe" = "Uninstall with Adobe";
+"Review Manual Removal" = "Review Manual Removal";
+
+/* Managed App Uninstall */
+"Checking how this app was installed…" = "Checking how this app was installed…";
+"Copy Terminal Command" = "Copy Terminal Command";
+"Homebrew command copied. Paste it in Terminal to continue." = "Homebrew command copied. Paste it in Terminal to continue.";
+"Homebrew could not finish. Try the Homebrew command in Terminal." = "Homebrew could not finish. Try the Homebrew command in Terminal.";
+"Homebrew finished, but the app or its cask is still present." = "Homebrew finished, but the app or its cask is still present.";
+"Homebrew removed %@." = "Homebrew removed %@.";
+"Homebrew will uninstall this cask using its standard removal command." = "Homebrew will uninstall this cask using its standard removal command.";
+"Installed from a package" = "Installed from a package";
+"Installed with Homebrew" = "Installed with Homebrew";
+"Manual removal moves only this application bundle to the Trash." = "Manual removal moves only this application bundle to the Trash.";
+"Move App to Trash" = "Move App to Trash";
+"Review this cask’s uninstall command in Terminal. Its recipe may affect other components." = "Review this cask’s uninstall command in Terminal. Its recipe may affect other components.";
+"The installation source could not be verified. Review this app in Finder." = "The installation source could not be verified. Review this app in Finder.";
+"The installed package changed. Refresh before trying again." = "The installed package changed. Refresh before trying again.";
+"Uninstall with Homebrew" = "Uninstall with Homebrew";
+"Uninstall with Homebrew?" = "Uninstall with Homebrew?";
+"Use the developer’s uninstaller for this package and its components." = "Use the developer’s uninstaller for this package and its components.";

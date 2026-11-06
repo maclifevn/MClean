@@ -389,7 +389,8 @@ enum BrewProcessRunner {
         executableURL: URL,
         arguments: [String],
         timeout: TimeInterval,
-        environment: [String: String]? = nil
+        environment: [String: String]? = nil,
+        outputLimit: Int = maxCapturedBytes
     ) async throws -> BrewProcessOutput {
         let handle = BrewProcessHandle()
         return try await withTaskCancellationHandler {
@@ -399,6 +400,7 @@ enum BrewProcessRunner {
                     arguments: arguments,
                     timeout: timeout,
                     environment: environment,
+                    outputLimit: outputLimit,
                     continuation: continuation
                 )
                 handle.attach(execution)
@@ -436,14 +438,15 @@ private final class BrewProcessExecution: @unchecked Sendable {
     private let process = Process()
     private let stdoutPipe = Pipe()
     private let stderrPipe = Pipe()
-    private lazy var stdoutReader = BrewPipeReader(maxBytes: BrewProcessRunner.maxCapturedBytes) { [weak self] in
+    private lazy var stdoutReader = BrewPipeReader(maxBytes: outputLimit) { [weak self] in
         self?.failForOutputLimit()
     }
-    private lazy var stderrReader = BrewPipeReader(maxBytes: BrewProcessRunner.maxCapturedBytes) { [weak self] in
+    private lazy var stderrReader = BrewPipeReader(maxBytes: outputLimit) { [weak self] in
         self?.failForOutputLimit()
     }
     private let readers = DispatchGroup()
     private let timeout: TimeInterval
+    private let outputLimit: Int
     private let continuation: CheckedContinuation<BrewProcessOutput, Error>
     private let lock = NSLock()
     private var startupError: Error?
@@ -462,9 +465,11 @@ private final class BrewProcessExecution: @unchecked Sendable {
         arguments: [String],
         timeout: TimeInterval,
         environment: [String: String]?,
+        outputLimit: Int,
         continuation: CheckedContinuation<BrewProcessOutput, Error>
     ) {
         self.timeout = timeout
+        self.outputLimit = outputLimit
         self.continuation = continuation
         process.executableURL = executableURL
         process.arguments = arguments

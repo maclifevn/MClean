@@ -64,7 +64,11 @@ Quét thư mục Nhà (hoặc bất kỳ thư mục nào) và xem toàn bộ dun
   <img src="docs/assets/app-uninstaller.png" alt="Gỡ ứng dụng — tìm mọi tệp liên quan trước khi xoá" width="820">
 </p>
 
-Chọn một ứng dụng và MClean đối chiếu bundle ID, tên ứng dụng, container và cấu trúc đường dẫn để tìm preferences, caches, launch agents, logs cùng các tệp hỗ trợ liên quan. Các kết quả nằm trong vùng người dùng hoặc công cụ dùng chung được để bỏ chọn mặc định nhằm tránh xoá nhầm dữ liệu không thuộc ứng dụng.
+Chọn một ứng dụng để xem gói .app và các tệp liên quan. MClean để các kết quả khớp gần đúng, dữ liệu dùng chung và mục của nhiều bản cài ở trạng thái cần xem xét. Các mục được xác nhận sẽ chuyển vào Thùng rác. Báo cáo sau thao tác liệt kê những mục còn lại và có thể mở các mục bị chặn quyền trong Finder.
+
+Với Photoshop, nút **Gỡ bằng Adobe** dùng trình gỡ có chữ ký Adobe và khớp phiên bản hoặc mở Adobe Creative Cloud. Khi phát hiện trình gỡ đi kèm của nhà phát triển khác, MClean có thể hiện trình gỡ đó trong Finder.
+
+MClean đối chiếu cask Homebrew với đích cài đặt thực tế. Cask chỉ chứa ứng dụng được gỡ bằng lệnh chuẩn của Homebrew, còn cask có nhiều ứng dụng hoặc bước gỡ riêng sẽ hiện lệnh để xem lại trong Terminal. Với bộ cài .pkg, MClean đối chiếu các receipt và ưu tiên trình gỡ của nhà phát triển. Tùy chọn Thùng rác chỉ áp dụng cho bundle riêng của gói đã xác minh.
 
 - Ba mức độ nhạy: **Nghiêm ngặt · Nâng cao · Sâu**
 - Ứng dụng hệ thống của Apple được bảo vệ, không thể gỡ nhầm

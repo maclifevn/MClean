@@ -2,12 +2,14 @@ import Foundation
 import AppKit
 
 struct InstalledApp: Identifiable, Hashable {
-    let id: UUID
     let appName: String
     let bundleIdentifier: String
     let path: URL
     let icon: NSImage
     let size: Int64
+    let version: String?
+
+    var id: URL { path.standardizedFileURL }
 
     var formattedSize: String {
         ByteCountFormatter.string(fromByteCount: size, countStyle: .file)
@@ -25,7 +27,7 @@ struct InstalledApp: Identifiable, Hashable {
 /// Lightweight identity used by Orphan Finder. It deliberately carries no
 /// icon or recursive bundle size, avoiding a full walk of every installed app
 /// when all the caller needs is an ownership index.
-struct InstalledAppIdentity {
+struct InstalledAppIdentity: Hashable {
     let appName: String
     let bundleIdentifier: String
 }
@@ -56,15 +58,15 @@ final class AppInfoFetcher {
         defer { fetchLock.unlock() }
 
         var apps: [InstalledApp] = []
-        var seenBundleIDs: Set<String> = []
+        var seenPaths: Set<URL> = []
         var sizeCache = loadSizeCache()
 
-        for url in discoveredAppURLs() {
-            guard let app = loadAppInfo(from: url, sizeCache: &sizeCache),
-                  !seenBundleIDs.contains(app.bundleIdentifier),
+        for discovered in discoveredAppURLs() {
+            let url = discovered.resolvingSymlinksInPath().standardizedFileURL
+            guard !url.path.hasPrefix("/System/"), seenPaths.insert(url).inserted,
+                  let app = loadAppInfo(from: url, sizeCache: &sizeCache),
                   !Self.protectedBundleIDs.contains(app.bundleIdentifier) else { continue }
 
-            seenBundleIDs.insert(app.bundleIdentifier)
             apps.append(app)
         }
 
@@ -78,12 +80,11 @@ final class AppInfoFetcher {
         defer { fetchLock.unlock() }
 
         var identities: [InstalledAppIdentity] = []
-        var seenBundleIDs: Set<String> = []
+        var seen: Set<InstalledAppIdentity> = []
         for url in discoveredAppURLs() {
             guard let identity = loadIdentity(from: url),
-                  !seenBundleIDs.contains(identity.bundleIdentifier),
-                  !Self.protectedBundleIDs.contains(identity.bundleIdentifier) else { continue }
-            seenBundleIDs.insert(identity.bundleIdentifier)
+                  !Self.protectedBundleIDs.contains(identity.bundleIdentifier),
+                  seen.insert(identity).inserted else { continue }
             identities.append(identity)
         }
         return identities
@@ -98,7 +99,8 @@ final class AppInfoFetcher {
     func fetchApp(at url: URL) -> InstalledApp? {
         fetchLock.lock()
         defer { fetchLock.unlock() }
-        guard url.pathExtension == "app", !url.path.hasPrefix("/System") else { return nil }
+        let url = url.resolvingSymlinksInPath().standardizedFileURL
+        guard url.pathExtension.lowercased() == "app", !url.path.hasPrefix("/System/") else { return nil }
         var sizeCache = loadSizeCache()
         guard let app = loadAppInfo(from: url, sizeCache: &sizeCache),
               !Self.protectedBundleIDs.contains(app.bundleIdentifier) else { return nil }
@@ -154,12 +156,12 @@ final class AppInfoFetcher {
         let size = appSize(at: url, cache: &sizeCache)
 
         return InstalledApp(
-            id: UUID(),
             appName: identity.appName,
             bundleIdentifier: identity.bundleIdentifier,
             path: url,
             icon: icon,
-            size: size
+            size: size,
+            version: NSDictionary(contentsOf: url.appendingPathComponent("Contents/Info.plist"))?["CFBundleShortVersionString"] as? String
         )
     }
 

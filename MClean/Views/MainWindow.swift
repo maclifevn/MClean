@@ -46,6 +46,7 @@ struct MainWindow: View {
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
             appState.checkFullDiskAccess()
             permission.refreshStatus()
+            appState.refreshAfterUninstallHandoff()
         }
         .onReceive(NotificationCenter.default.publisher(for: .mCleanSmartScanRequested)) { _ in
             consumeMenuBarSmartScanRequest()

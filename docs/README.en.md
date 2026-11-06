@@ -53,7 +53,11 @@ Apple sells base-model Macs with 256 GB SSDs that you can't upgrade. Once you've
   <img src="assets/app-uninstaller.png" alt="MClean App Uninstaller — every leftover file grouped before removal" width="820">
 </p>
 
-Discovers everything in `/Applications` and `~/Applications`, then uses a 10-level matching engine (bundle ID, team identifier, entitlements, Spotlight metadata, container discovery, company-name heuristics, partial path matches) to find every file the app dropped. Three sensitivity tiers — Strict, Enhanced, Deep. Apple system apps are excluded automatically. You can also right-click any app in Finder → **Services → Uninstall with MClean**.
+Review an app bundle and its suggested related files before moving selected items to the Trash. Broad matches and data shared by multiple installed versions require review. The removal report shows items that remain and can reveal permission-blocked paths in Finder.
+
+For Photoshop, **Uninstall with Adobe** opens the verified uninstaller for the selected version or Adobe Creative Cloud. MClean can reveal detected uninstallers from other developers in Finder. Choose Strict, Enhanced, or Deep matching, or right-click an app in Finder and select **Services → Uninstall with MClean**.
+
+MClean matches Homebrew casks to their installed destinations and uses Homebrew's standard uninstall command. Casks with multiple apps or additional uninstall steps can be reviewed in Terminal. For Installer packages, MClean checks receipts and prioritizes the developer's uninstaller. Its Trash option is limited to a bundle with a verified, exclusive package payload.
 
 ### Orphan Finder
 Walks `~/Library` and surfaces files left behind by apps that no longer exist on disk.

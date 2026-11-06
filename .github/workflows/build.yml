@@ -12,7 +12,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        runner: [macos-15, macos-15-intel, macos-14]
+        runner: [macos-15, macos-15-intel, macos-26]
     runs-on: ${{ matrix.runner }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1, Node 24
@@ -21,10 +21,6 @@ jobs:
         run: |
           sw_vers
           uname -m
-
-      - name: Select Xcode 16 on macOS 14
-        if: matrix.runner == 'macos-14'
-        run: sudo xcode-select --switch /Applications/Xcode_16.2.app/Contents/Developer
 
       - name: Install XcodeGen
         run: brew install xcodegen
@@ -43,8 +39,8 @@ jobs:
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGNING_ALLOWED=NO
 
-      - name: Test x86_64 on macOS 14 (Rosetta)
-        if: matrix.runner == 'macos-14'
+      - name: Test x86_64 on macOS 15 (Rosetta)
+        if: matrix.runner == 'macos-15'
         run: |
           xcodebuild test -project MClean.xcodeproj \
             -scheme MClean \
@@ -81,8 +77,8 @@ jobs:
           set -e
           test "$status" -eq 2
 
-      - name: Smoke test x86_64 on macOS 14 (Rosetta)
-        if: matrix.runner == 'macos-14'
+      - name: Smoke test x86_64 on macOS 15 (Rosetta)
+        if: matrix.runner == 'macos-15'
         run: |
           app="build/Build/Products/Release/MClean.app"
           arch -x86_64 "$app/Contents/MacOS/MClean" --version

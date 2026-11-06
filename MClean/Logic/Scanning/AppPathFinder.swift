@@ -26,7 +26,7 @@ class AppPathFinder {
     enum Sensitivity {
         case strict    // Exact bundle ID + exact name match only
         case enhanced  // + partial matching, bundle components, stripped version
-        case deep      // + company name, entitlements, team ID
+        case deep      // + separate publisher and product tokens, team ID
     }
 
     // MARK: - Properties
@@ -47,6 +47,7 @@ class AppPathFinder {
     private let appNameLettersOnly: String
     private let pathComponentName: String
     private let companyName: String?
+    private let productName: String?
     private let baseBundleID: String?
     private let strippedAppName: String?
     private let normalizedEntitlements: [String]
@@ -71,6 +72,7 @@ class AppPathFinder {
             .replacingOccurrences(of: ".app", with: "")
             .normalizedForMatching()
         self.companyName = appInfo.bundleIdentifier.bundleCompanyName
+        self.productName = appInfo.bundleIdentifier.split(separator: ".").last.map { String($0).normalizedForMatching() }
         self.baseBundleID = appInfo.bundleIdentifier.baseBundleIdentifier?.normalizedForMatching()
 
         let stripped = appInfo.appName.strippingTrailingVersion().normalizedForMatching()
@@ -175,6 +177,9 @@ class AppPathFinder {
         for (index, item) in contents.enumerated() {
             if index.isMultiple(of: 64), isCancelled { return }
             let itemURL = URL(fileURLWithPath: location).appendingPathComponent(item)
+            // The exact application is seeded separately. Never match or descend
+            // into a second application, including another version of this one.
+            guard itemURL.pathExtension.lowercased() != "app" else { continue }
             let normalizedName: String
 
             if itemURL.hasDirectoryPath || itemURL.pathExtension.isEmpty {
@@ -189,23 +194,7 @@ class AppPathFinder {
             if shouldSkipItem(normalizedName, at: itemURL) { continue }
 
             if matchesApp(normalizedName: normalizedName, itemURL: itemURL) {
-                let itemToAdd: URL
-
-                // For depth-2 matches in Library root, add the parent directory when
-                // it is a vendor folder (not a standard Library subdirectory).
-                if isLibraryRootSearch && currentDepth == 2 {
-                    let parent = itemURL.deletingLastPathComponent()
-                    let parentName = parent.lastPathComponent
-                    if !Locations.standardLibrarySubdirectories.contains(parentName) {
-                        itemToAdd = parent
-                    } else {
-                        itemToAdd = itemURL
-                    }
-                } else {
-                    itemToAdd = itemURL
-                }
-
-                localResults.append(itemToAdd)
+                localResults.append(itemURL)
             }
 
             // Recurse into subdirectories up to maxDepth
@@ -272,11 +261,11 @@ class AppPathFinder {
             if match { return true }
         }
 
+        let isStrict = sensitivity == .strict
         // Level 1: Full bundle identifier
-        let fullBundleMatch = normalizedName.contains(normalizedBundleID)
+        let fullBundleMatch = isStrict ? normalizedName == normalizedBundleID : normalizedName.contains(normalizedBundleID)
 
         // Level 2: App name
-        let isStrict = sensitivity == .strict
         let minLen = AppPathFinder.minMatchTokenLength
         let appNameMatch = normalizedAppName.count >= minLen && (isStrict
             ? normalizedName == normalizedAppName
@@ -308,12 +297,11 @@ class AppPathFinder {
             if let stripped = strippedAppName, stripped.count >= minLen, normalizedName.contains(stripped) { return true }
         }
 
-        // Deep mode: broadest matching heuristics
+        // A publisher's name alone can match files belonging to a different product.
         if sensitivity == .deep {
-            // Level 8: Company name extracted from bundle ID
-            if let company = companyName, company.count >= minLen, normalizedName.contains(company) { return true }
-
-            // Level 9: Team identifier from code signature
+            if let companyName, let productName, companyName != productName,
+               companyName.count >= minLen, productName.count >= minLen,
+               normalizedName.contains(companyName), normalizedName.contains(productName) { return true }
             if let teamID = normalizedTeamID, teamID.count >= minLen, normalizedName.contains(teamID) { return true }
         }
 
@@ -414,7 +402,12 @@ class AppPathFinder {
     /// Removes child paths when a parent is already in the set, and discards
     /// results that consist solely of a Trash item.
     private func filterSubpaths(_ urls: Set<URL>) -> Set<URL> {
-        let sorted = urls.map { $0.standardizedFileURL }.sorted { $0.path < $1.path }
+        let application = appInfo.path.standardizedFileURL
+        let sorted = urls.map { $0.standardizedFileURL }.filter { url in
+            if url.path == application.path { return true }
+            return !application.path.hasPrefix(url.path + "/")
+                && !url.pathComponents.contains { $0.lowercased().hasSuffix(".app") }
+        }.sorted { $0.path < $1.path }
         var filtered: [URL] = []
 
         for url in sorted {

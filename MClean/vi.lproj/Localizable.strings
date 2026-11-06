@@ -371,7 +371,7 @@
 "Include Small Files" = "Hiện cả tệp nhỏ";
 "Includes %lld selected items hidden by filters." = "Bao gồm %lld mục đã chọn đang bị bộ lọc ẩn.";
 "Includes company name, entitlements, and team identifier matching." = "Bao gồm đối chiếu tên công ty, quyền ứng dụng và mã nhóm phát triển.";
-"Includes company-name and broader bundle identifier matching." = "Bao gồm tên công ty và đối chiếu mã định danh gói rộng hơn.";
+"Matches publisher and product names separately." = "Đối chiếu riêng tên nhà phát triển và tên sản phẩm.";
 "Includes partial name matching and bundle ID components." = "Bao gồm khớp một phần tên và các thành phần bundle ID.";
 "Incoming network connections are filtered." = "Kết nối mạng đến đang được lọc.";
 "Inspect" = "Kiểm tra";
@@ -942,3 +942,35 @@
 "Please wait for the current task to finish." = "Vui lòng đợi tác vụ hiện tại hoàn tất.";
 
 "This file is excluded or protected: %@" = "Tệp này được loại trừ hoặc được bảo vệ: %@";
+
+/* App Uninstaller */
+"%lld moved to Trash, %lld already absent, %lld remaining" = "Đã chuyển %lld mục vào Thùng rác, %lld mục đã không còn, còn lại %lld mục";
+"A verified copy of Adobe Creative Cloud could not be found." = "Không tìm thấy bản Adobe Creative Cloud có chữ ký hợp lệ.";
+"Items still on disk" = "Các mục còn trên ổ đĩa";
+"macOS denied permission to move this item." = "macOS từ chối quyền di chuyển mục này.";
+"Protected from removal." = "Mục này được bảo vệ.";
+"Quit %@ before uninstalling it." = "Hãy thoát %@ trước khi gỡ cài đặt.";
+"Reveal Vendor Uninstaller" = "Hiện trình gỡ của nhà phát triển";
+"This item changed after the scan." = "Mục này đã thay đổi sau khi quét.";
+"This location may need Full Disk Access." = "Vị trí này có thể cần quyền Truy cập toàn bộ ổ đĩa.";
+"Uninstall with Adobe" = "Gỡ bằng Adobe";
+"Review Manual Removal" = "Xem mục để gỡ thủ công";
+
+/* Managed App Uninstall */
+"Checking how this app was installed…" = "Đang kiểm tra cách ứng dụng được cài đặt…";
+"Copy Terminal Command" = "Sao chép lệnh Terminal";
+"Homebrew command copied. Paste it in Terminal to continue." = "Đã sao chép lệnh Homebrew. Dán lệnh vào Terminal để tiếp tục.";
+"Homebrew could not finish. Try the Homebrew command in Terminal." = "Homebrew chưa gỡ xong. Hãy thử chạy lệnh Homebrew trong Terminal.";
+"Homebrew finished, but the app or its cask is still present." = "Homebrew đã chạy xong, nhưng ứng dụng hoặc cask vẫn còn.";
+"Homebrew removed %@." = "Homebrew đã gỡ %@.";
+"Homebrew will uninstall this cask using its standard removal command." = "Homebrew sẽ dùng lệnh gỡ chuẩn cho cask này.";
+"Installed from a package" = "Cài từ gói .pkg";
+"Installed with Homebrew" = "Cài bằng Homebrew";
+"Manual removal moves only this application bundle to the Trash." = "Gỡ thủ công chỉ chuyển gói ứng dụng này vào Thùng rác.";
+"Move App to Trash" = "Chuyển ứng dụng vào Thùng rác";
+"Review this cask’s uninstall command in Terminal. Its recipe may affect other components." = "Hãy xem lại lệnh gỡ cask trước khi chạy trong Terminal vì thao tác có thể ảnh hưởng đến các thành phần khác.";
+"The installation source could not be verified. Review this app in Finder." = "Chưa xác minh được nguồn cài đặt. Hãy xem ứng dụng này trong Finder.";
+"The installed package changed. Refresh before trying again." = "Gói đã cài đã thay đổi. Hãy làm mới trước khi thử lại.";
+"Uninstall with Homebrew" = "Gỡ bằng Homebrew";
+"Uninstall with Homebrew?" = "Gỡ bằng Homebrew?";
+"Use the developer’s uninstaller for this package and its components." = "Hãy dùng trình gỡ của nhà phát triển để xử lý gói và các thành phần của nó.";
