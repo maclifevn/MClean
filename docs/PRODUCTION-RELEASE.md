@@ -1,3 +1,14 @@
+# MClean 1.0.7 — phát hành 06/11/2026
+
+[MClean 1.0.7 / build 9](https://github.com/maclifevn/MClean/releases/tag/v1.0.7) được build từ commit `cc1f4688893aa1e297d92db2aaf5e2e2ed5230a0`. Build 9 cho phép người đã nhận bản thử build 8 cập nhật qua Sparkle.
+
+- 219 kiểm thử đạt. CI chạy trên macOS 15 Apple Silicon, macOS 15 Intel và macOS 26, cùng lượt x86_64 qua Rosetta. [Build CI](https://github.com/maclifevn/MClean/actions/runs/42209739139)
+- DMG và ZIP của CI chứa cùng app Universal với chữ ký Developer ID và ticket notarization hợp lệ. Kiểm tra Gatekeeper và CLI đạt trên cả hai kiến trúc. [Pipeline ký và đóng gói](https://github.com/maclifevn/MClean/actions/runs/42209740649)
+- Audit đối chiếu fixture Photoshop 2025 và trình gỡ Adobe thật trên máy cài Photoshop 2026. Ca trên máy báo lỗi ban đầu còn chờ xác nhận. Gỡ cask và gói .pkg mẫu giữ nguyên SHA-256 của dữ liệu dùng chung.
+- Appcast giữ các bản trước và trỏ build 9 đến ZIP đã kiểm chứng công khai. Chữ ký appcast và ZIP khớp khóa trong bản 1.0.6. Cask trong repo dùng checksum của ZIP đã tải công khai.
+
+---
+
 # MClean 1.0.6 — phát hành 11/10/2026
 
 **[Version 1.0.6 / build 7 đã phát hành trên GitHub](https://github.com/maclifevn/MClean/releases/tag/v1.0.6).** [PR #9](https://github.com/maclifevn/MClean/pull/9) đã merge, sửa khung nền Dashboard phía sau unified toolbar khi cửa sổ rộng và khi đưa con trỏ lên thanh tiêu đề. Bố cục các card được giữ nguyên. Tag `v1.0.6` trỏ tới source **`d916e1f5a79ecbd5476b7995622f5db1b9c7f88f`**.
