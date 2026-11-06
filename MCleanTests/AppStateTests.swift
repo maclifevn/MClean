@@ -142,8 +142,10 @@ final class AppStateTests: XCTestCase {
             if child > 0 { Darwin.kill(child, SIGKILL) }
             try? FileManager.default.removeItem(at: file)
         }
+        // The nested shell must have time to record its PID on Rosetta CI.
         let output = try CommandRunner.run(executable: "/bin/sh",
-            arguments: ["-c", "/bin/sh -c 'trap \"\" TERM; echo $$ > \"$1\"; exec /bin/sleep 120' child \"$1\" >/dev/null 2>&1 & wait", "mclean-fixture", file.path], timeout: 0.2)
+            arguments: ["-c", "/bin/sh -c 'trap \"\" TERM; echo $$ > \"$1\"; exec /bin/sleep 120' child \"$1\" >/dev/null 2>&1 & wait", "mclean-fixture", file.path],
+            timeout: 5)
         XCTAssertTrue(output.timedOut)
         child = try XCTUnwrap(Int32(String(contentsOf: file).trimmingCharacters(in: .whitespacesAndNewlines)))
         for _ in 0..<50 {

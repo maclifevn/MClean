@@ -252,8 +252,7 @@ jobs:
             --keychain-profile MCLEAN_NOTARY \
             --keychain "${RUNNER_TEMP}/app-signing.keychain-db" \
             --wait --timeout 30m
-          xcrun stapler staple build/export/MClean.app
-          xcrun stapler validate build/export/MClean.app
+          scripts/staple-ticket.sh build/export/MClean.app
           codesign --verify --deep --strict build/export/MClean.app
           spctl --assess --type execute --verbose=4 build/export/MClean.app
           # Final shippable zip with stapled ticket
@@ -289,8 +288,7 @@ jobs:
             --keychain "${RUNNER_TEMP}/app-signing.keychain-db" \
             --wait \
             --timeout 30m
-          xcrun stapler staple "${DMG}"
-          xcrun stapler validate "${DMG}"
+          scripts/staple-ticket.sh "${DMG}"
           spctl --assess --type install --verbose=4 "${DMG}"
 
       - name: Generate and verify signed appcast

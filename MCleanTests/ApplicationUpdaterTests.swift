@@ -276,8 +276,10 @@ final class ApplicationUpdaterTests: XCTestCase {
             try? FileManager.default.removeItem(at: file)
         }
         do {
+            // The nested shell must have time to record its PID on Rosetta CI.
             _ = try await BrewProcessRunner.run(executableURL: URL(fileURLWithPath: "/bin/sh"),
-                arguments: ["-c", "/bin/sh -c 'trap \"\" TERM; echo $$ > \"$1\"; exec /bin/sleep 120' child \"$1\" >/dev/null 2>&1 & wait", "mclean-fixture", file.path], timeout: 0.2)
+                arguments: ["-c", "/bin/sh -c 'trap \"\" TERM; echo $$ > \"$1\"; exec /bin/sleep 120' child \"$1\" >/dev/null 2>&1 & wait", "mclean-fixture", file.path],
+                timeout: 5)
             XCTFail("Expected timeout")
         } catch {
             XCTAssertEqual(error as? ApplicationUpdaterError, .timedOut)

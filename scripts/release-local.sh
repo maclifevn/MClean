@@ -113,8 +113,7 @@ ditto -c -k --keepParent --sequesterRsrc "${APP}" build/MClean-app.zip
 xcrun notarytool submit build/MClean-app.zip \
   --keychain-profile "${NOTARY_PROFILE}" \
   --wait --timeout 30m
-xcrun stapler staple "${APP}"
-xcrun stapler validate "${APP}"
+scripts/staple-ticket.sh "${APP}"
 codesign --verify --deep --strict "${APP}"
 spctl --assess --type execute --verbose=4 "${APP}"
 
@@ -135,8 +134,7 @@ echo "==> notarize dmg"
 xcrun notarytool submit "${DMG}" \
   --keychain-profile "${NOTARY_PROFILE}" \
   --wait --timeout 30m
-xcrun stapler staple "${DMG}"
-xcrun stapler validate "${DMG}"
+scripts/staple-ticket.sh "${DMG}"
 spctl --assess --type install --verbose=4 "${DMG}"
 
 echo "==> final zip with stapled app"
